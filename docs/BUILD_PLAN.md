@@ -2,6 +2,13 @@
 
 Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The rules in [CLAUDE.md](../CLAUDE.md) apply to every phase. Each phase ends with a "Done when" check. Don't start the next phase until it passes.
 
+## Status
+
+| Phase                      | State             | Notes                                                                           |
+| -------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| 0. Tooling and foundations | Done (2026-10-02) | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green |
+| 1. Data model and security | Next              | Waiting on decision 5 (hosted Supabase or local Docker)                         |
+
 ## Start these now (they take weeks and don't depend on code)
 
 | Item                                                                               | Why it's slow                                                                                                                |
