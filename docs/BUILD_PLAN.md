@@ -4,11 +4,11 @@ Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The
 
 ## Status
 
-| Phase                      | State                 | Notes                                                                                                                                                            |
-| -------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0. Tooling and foundations | Done (2026-10-02)     | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green                                                                                  |
-| 1. Data model and security | Partly done           | Core, consent, audit and billing tables with RLS. Question bank, practice and WhatsApp tables follow in their own phases. Not yet applied to the hosted project. |
-| 4. Payments                | Built, offline-tested | Stripe, Paystack and Manual behind one interface; sponsor links; referral codes. Live check with test keys still to do (see "Payments setup").                   |
+| Phase                      | State                                       | Notes                                                                                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0. Tooling and foundations | Done (2026-10-02)                           | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green                                                                                                                                                                |
+| 1. Data model and security | Partly done                                 | Core, consent, audit and billing tables with RLS. Question bank, practice and WhatsApp tables follow in their own phases. Not yet applied to the hosted project.                                                                               |
+| 4. Payments                | Code done (2026-10-02); live check deferred | Stripe, Paystack and Manual behind one interface; sponsor links; referral codes. "Done when" proven offline with signed webhooks. Deferred until keys are added: `db:push`, `seed:dev` and a Stripe test-mode checkout (see "Payments setup"). |
 
 ## Start these now (they take weeks and don't depend on code)
 

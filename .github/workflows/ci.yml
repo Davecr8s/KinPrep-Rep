@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # Every branch push is checked; pull requests from forks are checked too.
   push:
-    branches: [main]
   pull_request:
 
 concurrency:
