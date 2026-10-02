@@ -1,0 +1,4 @@
+# Keep LF line endings on every OS so Prettier and CI agree with Windows checkouts.
+* text=auto eol=lf
+*.ico binary
+*.png binary

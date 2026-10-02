@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Brand tokens. Use these (bg-navy, text-orange, ...) instead of raw hex values. */
+@theme {
+  --color-navy: #25308a;
+  --color-navy-dark: #1b2468;
+  --color-orange: #f0a93c;
+  --color-orange-light: #fbe7c4;
+  /* System fonts only: no web-font download on slow connections. */
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+body {
+  background: var(--color-white);
+  color: var(--color-navy-dark);
+}
