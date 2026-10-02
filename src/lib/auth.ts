@@ -16,6 +16,17 @@ export const currentUser = cache(async (): Promise<SignedInUser | null> => {
   return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
 });
 
+/** Admin pages: signed in with the admin role, otherwise sign-in (or 404 for non-admins). */
+export async function requireAdmin(next: string): Promise<SignedInUser> {
+  const user = await currentUser();
+  if (!user) redirect(`/app/sign-in?next=${encodeURIComponent(next)}`);
+  const db = await userDb();
+  const { data, error } = await db.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (data?.role !== "admin") notFound();
+  return user;
+}
+
 export async function requireUser(): Promise<SignedInUser> {
   const user = await currentUser();
   if (!user) redirect("/app/sign-in");

@@ -7,8 +7,7 @@ import type { ChildInput } from "@/lib/validation/forms";
 // Writes behind the payer app's server actions (service role). Callers have already checked
 // that the signed-in user may make the change.
 
-export class DuplicateWhatsAppError extends Error {}
-
+/** Creates the student. Siblings may share a household WhatsApp number. */
 export async function createStudent(
   input: ChildInput,
   owner: { ownerId: string; groupId?: string },
@@ -30,11 +29,7 @@ export async function createStudent(
     })
     .select("id")
     .single();
-  if (error) {
-    if (error.code === "23505" && error.message.includes("whatsapp"))
-      throw new DuplicateWhatsAppError();
-    throw new Error(`Creating student failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Creating student failed: ${error.message}`);
   return data.id as string;
 }
 

@@ -5,12 +5,7 @@ import type { ChildFormState } from "@/components/child-fields";
 import { requirePayer } from "@/lib/auth";
 import { getBillingStore } from "@/lib/payments/server";
 import { startFreeTrial } from "@/lib/payments/trial";
-import {
-  createConsentRequest,
-  createStudent,
-  DuplicateWhatsAppError,
-  recordConsent,
-} from "@/lib/services/students";
+import { createConsentRequest, createStudent, recordConsent } from "@/lib/services/students";
 import { childSchema, fieldErrors, GuardianSchema } from "@/lib/validation/forms";
 
 const TEXT_FIELDS = [
@@ -48,15 +43,7 @@ export async function addChild(_prev: ChildFormState, formData: FormData): Promi
     };
   }
 
-  let studentId: string;
-  try {
-    studentId = await createStudent(child.data, { ownerId: user.id });
-  } catch (error) {
-    if (error instanceof DuplicateWhatsAppError) {
-      return { values, errors: { whatsapp: "This number is already used by another student." } };
-    }
-    throw error;
-  }
+  const studentId = await createStudent(child.data, { ownerId: user.id });
 
   if (guardian.data.isGuardian === "yes") {
     await recordConsent(studentId, { givenBy: user.id, method: "web_checkbox" });

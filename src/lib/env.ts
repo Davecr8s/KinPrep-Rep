@@ -38,6 +38,16 @@ export const envGroups = {
     WHATSAPP_PHONE_NUMBER_ID: secret,
     WHATSAPP_APP_SECRET: secret,
     WHATSAPP_VERIFY_TOKEN: z.string().min(16),
+    WHATSAPP_GRAPH_VERSION: z
+      .string()
+      .regex(/^v\d+\.\d+$/)
+      .default("v23.0"),
+    // Approved template with a "Start" quick-reply button, for the morning nudge.
+    WHATSAPP_TEMPLATE_MORNING: z.string().min(1).optional(),
+  }),
+  // Direct Postgres for the WhatsApp bot (transaction pooler URL, port 6543).
+  database: z.object({
+    SUPABASE_DB_URL: z.string().startsWith("postgres"),
   }),
   llm: z.object({
     LLM_API_KEY: secret,

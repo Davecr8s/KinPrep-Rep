@@ -6,6 +6,7 @@
 // then 8 weeks of sessions: most days practised, accuracy improving, one weak topic per subject.
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { ensureDemoQuestions, ensureReviewer, TOPICS, type Subject } from "./lib/demo-content.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secret = process.env.SUPABASE_SECRET_KEY;
@@ -20,13 +21,6 @@ function must<T>(result: { data: T; error: { message: string } | null }, what: s
   return result.data;
 }
 
-type Subject = "english" | "mathematics" | "physics" | "biology";
-const TOPICS: Record<Subject, string[]> = {
-  english: ["Concord", "Comprehension", "Lexis and structure", "Oral English", "Summary"],
-  mathematics: ["Algebra", "Indices and logarithms", "Geometry", "Statistics", "Probability"],
-  physics: ["Motion", "Vectors", "Electricity", "Waves", "Heat"],
-  biology: ["Cells", "Ecology", "Genetics", "Nutrition", "Reproduction"],
-};
 // The topic each fake student finds hardest, so "weakest topics" has something to show.
 const WEAK: Record<Subject, string> = {
   english: "Oral English",
@@ -35,64 +29,11 @@ const WEAK: Record<Subject, string> = {
   biology: "Genetics",
 };
 
-// 1. Seed reviewer (questions must be approved by a teacher).
-const REVIEWER_EMAIL = "seed-reviewer@kinprep.test";
+// 1-2. Seed reviewer, demo topics and approved demo questions.
+const questionIds = await ensureDemoQuestions(db, await ensureReviewer(db));
 const listed = await db.auth.admin.listUsers({ perPage: 1000 });
 if (listed.error) throw new Error(`list users: ${listed.error.message}`);
 const users = listed.data;
-let reviewerId = users.users.find((u) => u.email === REVIEWER_EMAIL)?.id;
-if (!reviewerId) {
-  const created = await db.auth.admin.createUser({ email: REVIEWER_EMAIL, email_confirm: true });
-  if (created.error) throw new Error(`reviewer: ${created.error.message}`);
-  reviewerId = created.data.user.id;
-}
-must(await db.from("profiles").upsert({ id: reviewerId, role: "reviewer" }), "reviewer profile");
-
-// 2. Demo topics and approved demo questions.
-const questionIds = new Map<string, { id: string; subject: Subject; topic: string }[]>();
-for (const [subject, names] of Object.entries(TOPICS) as [Subject, string[]][]) {
-  for (const name of names) {
-    const topic = must(
-      await db
-        .from("topics")
-        .upsert({ subject, name }, { onConflict: "subject,name" })
-        .select("id")
-        .single(),
-      "topic",
-    ) as { id: string };
-    let existing = must(
-      await db.from("questions").select("id").eq("topic_id", topic.id),
-      "questions",
-    ) as { id: string }[];
-    if (existing.length === 0) {
-      existing = must(
-        await db
-          .from("questions")
-          .insert(
-            [1, 2, 3, 4].map((n) => ({
-              subject,
-              topic_id: topic.id,
-              stem: `[Demo] ${name} practice question ${n}. Which option is correct?`,
-              options: ["Option A", "Option B", "Option C", "Option D"],
-              answer_index: n % 4,
-              explanation_en: `Demo explanation for ${name} question ${n}.`,
-              explanation_pcm: `Demo explanation for ${name} question ${n}, for Pidgin.`,
-              status: "approved",
-              approved_by: reviewerId,
-              approved_at: new Date().toISOString(),
-              created_by: reviewerId,
-            })),
-          )
-          .select("id"),
-        "insert questions",
-      ) as { id: string }[];
-    }
-    questionIds.set(
-      `${subject}:${name}`,
-      existing.map((q) => ({ id: q.id, subject, topic: name })),
-    );
-  }
-}
 
 // 3. Which students.
 const emailArg = process.argv.indexOf("--email");

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import type { ChildFormState } from "@/components/child-fields";
 import { assignSeat, findGroupInvite } from "@/lib/services/groups";
-import { createStudent, DuplicateWhatsAppError, recordConsent } from "@/lib/services/students";
+import { createStudent, recordConsent } from "@/lib/services/students";
 import { childSchema, fieldErrors } from "@/lib/validation/forms";
 
 const TEXT_FIELDS = [
@@ -37,18 +37,10 @@ export async function joinGroup(
     errors.consent = "As the child's parent or guardian, tick the box to agree.";
   if (!child.success || errors.consent) return { values, errors };
 
-  let studentId: string;
-  try {
-    studentId = await createStudent(child.data, {
-      ownerId: invite!.ownerId,
-      groupId: invite!.groupId,
-    });
-  } catch (error) {
-    if (error instanceof DuplicateWhatsAppError) {
-      return { values, errors: { whatsapp: "This number is already used by another student." } };
-    }
-    throw error;
-  }
+  const studentId = await createStudent(child.data, {
+    ownerId: invite!.ownerId,
+    groupId: invite!.groupId,
+  });
   // The person filling this in declares they are the guardian; there's no account to link.
   await recordConsent(studentId, { givenBy: null, method: "web_checkbox" });
   const seated = await assignSeat(invite!.groupId, studentId);

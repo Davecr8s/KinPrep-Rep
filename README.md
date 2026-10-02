@@ -31,6 +31,7 @@ npm run dev                  # http://localhost:3000
 | `npm run db:push`                          | Apply migrations to the database in `SUPABASE_DB_URL`                                     |
 | `npm run seed:dev`                         | Create fake development data and print a sponsor link                                     |
 | `npm run seed:progress -- --email <email>` | Fake 8 weeks of practice for that payer's children (or all children with none)            |
+| `npm run make-admin -- --email <email>`    | Give an existing account the admin role (needed for /admin)                               |
 | `npm run paystack:plans`                   | Create the naira plans in Paystack and print their codes                                  |
 
 ## Layout
@@ -49,6 +50,9 @@ npm run dev                  # http://localhost:3000
 | `src/app/consent/[token]/`, `src/app/join/[token]/` | Public pages: guardian consent, joining a group by invite link                                         |
 | `src/lib/rules/progress.ts`                         | Dots, streak, accuracy trend, weakest topics, weekly report and its WhatsApp text                      |
 | `src/proxy.ts`                                      | Refreshes the Supabase session and guards /app                                                         |
+| `src/lib/whatsapp/`                                 | WhatsApp bot: webhook parsing, job table, bot logic, outbox (24-hour window, STOP), simulator          |
+| `src/app/api/whatsapp/`                             | Meta webhook (verification and inbound messages)                                                       |
+| `src/app/admin/dev/whatsapp/`                       | WhatsApp simulator for admins                                                                          |
 | `supabase/migrations/`                              | Database schema, RLS policies and billing functions                                                    |
 | `test/`                                             | Database and end-to-end payment tests (PGlite), shared test helpers                                    |
 | `scripts/`                                          | Database push, dev seed, Paystack plan setup                                                           |
