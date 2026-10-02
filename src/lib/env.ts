@@ -18,6 +18,11 @@ export const envGroups = {
     NEXT_PUBLIC_SUPABASE_URL: z.url(),
     SUPABASE_SECRET_KEY: secret,
   }),
+  // Signed-in user's client: RLS applies. The publishable key is public, not a secret.
+  supabaseAuth: z.object({
+    NEXT_PUBLIC_SUPABASE_URL: z.url(),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: secret,
+  }),
   stripe: z.object({
     STRIPE_SECRET_KEY: z.string().startsWith("sk_"),
     STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_"),

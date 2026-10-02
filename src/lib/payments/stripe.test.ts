@@ -25,6 +25,7 @@ function fakeApi() {
     subscriptions: {
       retrieve: vi.fn(),
       update: vi.fn(async (_id: string, _params: unknown) => ({})),
+      cancel: vi.fn(async (_id: string) => ({})),
     },
     billingPortal: {
       sessions: {
@@ -140,6 +141,15 @@ describe("Stripe cancel and manage link", () => {
     const { api, typed } = fakeApi();
     await createStripeProvider({ api: typed, store, webhookSecret: "w" }).cancel(record);
     expect(api.subscriptions.update).toHaveBeenCalledWith("sub_1", { cancel_at_period_end: true });
+    expect(api.subscriptions.cancel).not.toHaveBeenCalled();
+  });
+
+  it("cancels at once when a child's data is being deleted", async () => {
+    const { api, typed } = fakeApi();
+    await createStripeProvider({ api: typed, store, webhookSecret: "w" }).cancel(record, {
+      immediately: true,
+    });
+    expect(api.subscriptions.cancel).toHaveBeenCalledWith("sub_1");
   });
 
   it("opens the customer portal for card changes and cancellation", async () => {

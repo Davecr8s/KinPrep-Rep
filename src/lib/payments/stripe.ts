@@ -28,6 +28,7 @@ export type StripeApi = {
   subscriptions: {
     retrieve(id: string): Promise<Stripe.Subscription>;
     update(id: string, params: Stripe.SubscriptionUpdateParams): Promise<Stripe.Subscription>;
+    cancel(id: string): Promise<Stripe.Subscription>;
   };
   billingPortal: {
     sessions: {
@@ -48,6 +49,7 @@ const MetadataSchema = z
     student_id: z.uuid().optional(),
     group_account_id: z.uuid().optional(),
     ambassador_id: z.uuid().optional(),
+    payer_id: z.uuid().optional(),
     referral_code: z.string().optional(),
   })
   .refine((m) => Boolean(m.student_id) !== Boolean(m.group_account_id));
@@ -79,6 +81,7 @@ function identity(meta: KinPrepMetadata): SubscriptionPatch {
     ...(meta.student_id ? { student_id: meta.student_id } : {}),
     ...(meta.group_account_id ? { group_account_id: meta.group_account_id } : {}),
     ...(meta.ambassador_id ? { ambassador_id: meta.ambassador_id } : {}),
+    ...(meta.payer_id ? { payer_id: meta.payer_id } : {}),
     ...(meta.referral_code ? { referral_code: meta.referral_code } : {}),
   };
 }
@@ -282,6 +285,7 @@ export function createStripeProvider(deps: {
         ...(input.referral
           ? { ambassador_id: input.referral.ambassadorId, referral_code: input.referral.code }
           : {}),
+        ...(input.payerId ? { payer_id: input.payerId } : {}),
       };
       const session = await api.checkout.sessions.create({
         mode: "subscription",
@@ -324,9 +328,13 @@ export function createStripeProvider(deps: {
       return { status: await store.applyBillingEvent(update), eventId: event.id };
     },
 
-    async cancel(subscription) {
+    async cancel(subscription, context) {
       if (!subscription.providerSubscriptionId) {
         throw new Error("This subscription has no Stripe subscription id");
+      }
+      if (context?.immediately) {
+        await api.subscriptions.cancel(subscription.providerSubscriptionId);
+        return;
       }
       // Ends at the close of the period already paid for; the deleted webhook then follows.
       await api.subscriptions.update(subscription.providerSubscriptionId, {

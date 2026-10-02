@@ -20,9 +20,11 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "db:push": "node --env-file=.env.local scripts/db-push.mjs",
     "seed:dev": "node --env-file=.env.local scripts/dev-seed.ts",
+    "seed:progress": "node --env-file=.env.local scripts/seed-progress.ts",
     "paystack:plans": "node --env-file=.env.local scripts/paystack-plans.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.8",
     "react": "19.2.8",

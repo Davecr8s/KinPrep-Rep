@@ -31,9 +31,13 @@ if (!parentId) {
 }
 const profile = await db.from("profiles").upsert({ id: parentId, role: "payer" });
 if (profile.error) fail("profile", profile.error);
-const payer = await db
-  .from("payers")
-  .upsert({ id: parentId, region: "nigeria", currency: "NGN", timezone: "Africa/Lagos" });
+const payer = await db.from("payers").upsert({
+  id: parentId,
+  payer_type: "parent",
+  region: "nigeria",
+  currency: "NGN",
+  timezone: "Africa/Lagos",
+});
 if (payer.error) fail("payer", payer.error);
 
 // 2. Demo student with consent.

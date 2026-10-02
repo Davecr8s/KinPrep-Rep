@@ -7,6 +7,8 @@ export type SubscriptionStatus = "incomplete" | "trialing" | "active" | "past_du
 
 /** One thing that can give a student access: their own subscription or a group seat. */
 export type Coverage = {
+  /** "trial" is KinPrep's own free trial: no grace period when it ends. */
+  provider?: "stripe" | "paystack" | "manual" | "trial";
   status: SubscriptionStatus;
   currentPeriodEnd: Date | null;
   trialEnd: Date | null;
@@ -14,7 +16,12 @@ export type Coverage = {
 };
 
 export type AccessState = "active" | "grace" | "inactive";
-export type Access = { state: AccessState; until: Date | null };
+export type Access = {
+  state: AccessState;
+  until: Date | null;
+  /** Set when a guardian hasn't consented yet: inactive whatever has been paid. */
+  awaitingConsent?: boolean;
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -30,11 +37,19 @@ function addDays(date: Date | null, days: number): Date | null {
  *   the first failure), falling back to GRACE_DAYS after the period end.
  * - canceled: keeps the time already paid for, with no grace afterwards.
  * - incomplete: never gave access (checkout not finished, or paused).
+ * - KinPrep's own free trial: until it ends, with no grace (grace is for failed payments).
  */
 export function coverageWindow(coverage: Coverage): {
   paidThrough: Date | null;
   graceEnd: Date | null;
 } {
+  if (coverage.provider === "trial") {
+    return {
+      paidThrough:
+        coverage.status === "incomplete" ? null : (coverage.trialEnd ?? coverage.currentPeriodEnd),
+      graceEnd: null,
+    };
+  }
   switch (coverage.status) {
     case "trialing": {
       const end = coverage.trialEnd ?? coverage.currentPeriodEnd;

@@ -4,7 +4,8 @@
 -- and writes the ledger in one transaction. Access is decided only by isStudentActive
 -- (src/lib/payments/access.ts) from student_coverages below.
 
-create type public.payment_provider as enum ('stripe', 'paystack', 'manual');
+-- 'trial' is KinPrep's own no-card free trial (naira payers; Stripe trials live in Stripe).
+create type public.payment_provider as enum ('stripe', 'paystack', 'manual', 'trial');
 create type public.subscription_status as enum ('incomplete', 'trialing', 'active', 'past_due', 'canceled');
 create type public.payment_status as enum ('succeeded', 'failed', 'refunded');
 
@@ -227,6 +228,28 @@ begin
     end if;
 
     -- 2. First event for this subscription: create it.
+    if v_sub.id is null
+      and s ->> 'student_id' is not null
+      and not exists (select 1 from public.students where id = (s ->> 'student_id')::uuid)
+    then
+      -- The student's data was deleted (their subscriptions were cancelled first). Keep the event
+      -- for the record and the payment in the ledger, but recreate nothing.
+      if pay is not null then
+        insert into public.payments (
+          provider, provider_payment_id, status, amount_minor, currency, occurred_at, channel
+        )
+        values (
+          v_provider, pay ->> 'provider_payment_id', (pay ->> 'status')::public.payment_status,
+          (pay ->> 'amount_minor')::bigint, (pay ->> 'currency')::public.currency,
+          coalesce((pay ->> 'occurred_at')::timestamptz, v_occurred), pay ->> 'channel'
+        )
+        on conflict (provider, provider_payment_id) do nothing;
+      end if;
+      update public.billing_events set processed_at = now()
+      where provider = v_provider and event_id = v_event_id;
+      return jsonb_build_object('result', 'applied', 'note', 'student deleted');
+    end if;
+
     if v_sub.id is null then
       if s ->> 'id' is not null or (s ->> 'student_id' is null and s ->> 'group_account_id' is null) then
         -- Usually an event that arrived before the one that creates the subscription. Raising

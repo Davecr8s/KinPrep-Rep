@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "KinPrep", template: "%s · KinPrep" },
   description: "They practise daily. You see the proof every Sunday.",
+  applicationName: "KinPrep",
+  // iPhone "Add to Home Screen" (the web manifest covers Android).
+  appleWebApp: { capable: true, title: "KinPrep", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

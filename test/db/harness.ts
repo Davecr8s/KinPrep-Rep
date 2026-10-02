@@ -59,7 +59,7 @@ export async function createUser(
   await db.query("insert into public.profiles (id, role) values ($1, $2)", [id, role]);
   if (role === "payer") {
     await db.query(
-      "insert into public.payers (id, region, currency, timezone) values ($1, 'abroad', 'GBP', 'Europe/London')",
+      "insert into public.payers (id, region, currency, timezone, payer_type) values ($1, 'abroad', 'GBP', 'Europe/London', 'sponsor')",
       [id],
     );
   }
@@ -77,19 +77,35 @@ export const JUNIOR_BIRTH_YEAR = lagosYear() - 12;
 export async function createStudent(
   db: PGlite,
   ownerId: string,
-  overrides: { firstName?: string; birthYear?: number; whatsapp?: string | null } = {},
+  overrides: {
+    firstName?: string;
+    birthYear?: number;
+    whatsapp?: string | null;
+    /** Record guardian consent (default true, as most tests are about something else). */
+    consent?: boolean;
+    groupId?: string;
+  } = {},
 ): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `insert into public.students (owner_id, first_name, last_initial, class, birth_year, exam, subjects, whatsapp_number)
-     values ($1, $2, 'O', 'SS2', $3, 'WASSCE', '{english,mathematics}', $4) returning id`,
+    `insert into public.students (owner_id, first_name, last_initial, class, birth_year, exam, subjects, whatsapp_number, group_account_id)
+     values ($1, $2, 'O', 'SS2', $3, 'WASSCE', '{english,mathematics}', $4, $5) returning id`,
     [
       ownerId,
       overrides.firstName ?? "Ada",
       overrides.birthYear ?? SENIOR_BIRTH_YEAR,
       overrides.whatsapp ?? null,
+      overrides.groupId ?? null,
     ],
   );
-  return rows[0]!.id;
+  const id = rows[0]!.id;
+  if (overrides.consent ?? true) {
+    await db.query(
+      `insert into public.guardian_consents (student_id, event, method, consent_text_version, given_by)
+       values ($1, 'granted', 'web_checkbox', 'test', $2)`,
+      [id, ownerId],
+    );
+  }
+  return id;
 }
 
 export async function createGroup(db: PGlite, ownerId: string): Promise<string> {

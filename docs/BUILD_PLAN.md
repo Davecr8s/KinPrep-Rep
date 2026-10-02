@@ -4,11 +4,12 @@ Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The
 
 ## Status
 
-| Phase                      | State                                       | Notes                                                                                                                                                                                                                                          |
-| -------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0. Tooling and foundations | Done (2026-10-02)                           | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green                                                                                                                                                                |
-| 1. Data model and security | Partly done                                 | Core, consent, audit and billing tables with RLS. Question bank, practice and WhatsApp tables follow in their own phases. Not yet applied to the hosted project.                                                                               |
-| 4. Payments                | Code done (2026-10-02); live check deferred | Stripe, Paystack and Manual behind one interface; sponsor links; referral codes. "Done when" proven offline with signed webhooks. Deferred until keys are added: `db:push`, `seed:dev` and a Stripe test-mode checkout (see "Payments setup"). |
+| Phase                      | State                                       | Notes                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0. Tooling and foundations | Done (2026-10-02)                           | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green                                                                                                                                                                                                                       |
+| 1. Data model and security | Mostly done                                 | Core, consent, audit, billing, payer-app and practice-data tables (topics, questions, sessions, answers) with RLS. WhatsApp tables come with Phase 8. Not yet applied to the hosted project.                                                                                                          |
+| 3. Payer app               | Code done (2026-10-02); live check deferred | Landing, PWA, magic-link sign-in, onboarding, add child with guardian consent, plans, dashboard, weekly report, settings, co-sponsors, data export/delete, groups. Offline tests pass; the Done-when journey (`e2e/payer-journey.spec.ts`) needs Supabase + Stripe test keys (see "Payer app setup"). |
+| 4. Payments                | Code done (2026-10-02); live check deferred | Stripe, Paystack and Manual behind one interface; sponsor links; referral codes. "Done when" proven offline with signed webhooks. Deferred until keys are added: `db:push`, `seed:dev` and a Stripe test-mode checkout (see "Payments setup").                                                        |
 
 ## Start these now (they take weeks and don't depend on code)
 
@@ -23,11 +24,20 @@ Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The
 
 1. **Under-13 rule with birth year only (Phase 1).** We store the birth year, not a full date, so a child born in 2013 could be 12 or 13 during 2026. Recommendation: treat a student as 13+ only when `current_year - birth_year >= 14`. Otherwise they are junior: web page only, no WhatsApp. _Implemented as recommended (database trigger on `students`); still awaiting confirmation._
 2. **Naira renewals by transfer or USSD (Phase 4).** _Decided 2026-10-02: pay-per-period._ Cards renew through Paystack subscriptions; each transfer or USSD payment buys one week or month, and the 3-day grace period covers late payers. Renewal reminders come with the payer app.
-3. **Payer sign-in (Phase 3).** Email magic link (cheapest, simplest) or phone OTP (more natural in Nigeria, but costs per SMS).
+3. **Payer sign-in (Phase 3).** _Decided 2026-10-02: email magic link_, with the 6-digit code from the same email as a fallback for in-app browsers.
 4. **AI explanations (Phase 7).** Generate them live, or generate them ahead of time so a teacher approves them alongside the question (safer, cheaper, works offline from the LLM). Also pick the LLM provider.
 5. **Local database (Phase 0).** _Decided 2026-10-02: hosted Supabase dev project_ (`ngfioqnicgtwyfxpzkvm`). Tests run the migrations in PGlite, an in-process Postgres, so they need no database.
 6. **USD and CAD price points, and the time on Sunday that payer reports go out (Phase 9).** _Prices: the provisional ones in `src/config/pricing.ts` are in use for now._ Report time still open.
-7. **Free trial for naira payers (Phase 3).** Stripe checkouts include the 7-day trial. Paystack has no built-in trial, so Nigerian payers currently pay from day one. Option: grant a 7-day app-level trial at sign-up.
+7. **Free trial for naira payers (Phase 3).** _Implemented 2026-10-02:_ a 7-day no-card trial starts when a naira payer adds a child (provider `trial`, one per student, no grace period when it ends). Stripe sponsors get theirs in Checkout. Confirm this is wanted.
+
+## Payer app setup (to finish the Phase 3 "Done when")
+
+1. `.env.local`: add `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as well as the payments keys below.
+2. Supabase dashboard > Authentication > URL Configuration: Site URL `http://localhost:3000` (later the live URL); add `http://localhost:3000/**` and `https://kinprep-rep.vercel.app/**` to Redirect URLs.
+3. Authentication > Email Templates > Magic Link: make the link `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email` and show the code `{{ .Token }}` in the email too. The link then works even if the email opens in another browser.
+4. `npm run db:push`, `npm run dev`, sign up in a phone-sized window, add children, pay with Stripe test card 4242 4242 4242 4242, then `npm run seed:progress -- --email <your email>` to see progress.
+5. Automated version: with `stripe listen` running, `E2E_FULL=1 npx playwright test e2e/payer-journey.spec.ts`.
+6. Manual bank transfer for naira payers stays hidden until the admin stores KinPrep's account in `settings` (key `manual_bank_details`: `{"bank", "accountName", "accountNumber"}`).
 
 ## Payments setup (to finish the Phase 4 "Done when")
 

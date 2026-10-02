@@ -31,6 +31,18 @@ export function createSupabaseBillingStore(db: SupabaseClient): BillingStore {
       return z.array(z.unknown()).parse(data).map(toCoverage);
     },
 
+    async hasGuardianConsent(studentId) {
+      const { data, error } = await db
+        .from("guardian_consents")
+        .select("event")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) fail("hasGuardianConsent", error);
+      return data?.event === "granted";
+    },
+
     async hasAnySubscription(studentId) {
       const { count, error } = await db
         .from("subscriptions")

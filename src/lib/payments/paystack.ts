@@ -39,6 +39,7 @@ const MetadataSchema = z.object({
   student_id: z.uuid().optional(),
   group_account_id: z.uuid().optional(),
   ambassador_id: z.uuid().optional(),
+  payer_id: z.uuid().optional(),
   referral_code: z.string().optional(),
 });
 type PaystackMetadata = z.infer<typeof MetadataSchema>;
@@ -119,6 +120,7 @@ function identity(meta: PaystackMetadata): SubscriptionPatch {
     ...(meta.student_id ? { student_id: meta.student_id } : {}),
     ...(meta.group_account_id ? { group_account_id: meta.group_account_id } : {}),
     ...(meta.ambassador_id ? { ambassador_id: meta.ambassador_id } : {}),
+    ...(meta.payer_id ? { payer_id: meta.payer_id } : {}),
     ...(meta.referral_code ? { referral_code: meta.referral_code } : {}),
   };
 }
@@ -340,6 +342,7 @@ export function createPaystackProvider(deps: {
           ...(input.referral
             ? { ambassador_id: input.referral.ambassadorId, referral_code: input.referral.code }
             : {}),
+          ...(input.payerId ? { payer_id: input.payerId } : {}),
           cancel_action: input.cancelUrl,
         },
       });

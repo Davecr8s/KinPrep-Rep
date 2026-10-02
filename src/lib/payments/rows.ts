@@ -12,6 +12,7 @@ const Timestamp = z
 const Status = z.enum(["incomplete", "trialing", "active", "past_due", "canceled"]);
 
 export const CoverageRowSchema = z.object({
+  provider: z.enum(["stripe", "paystack", "manual", "trial"]).optional(),
   status: Status,
   current_period_end: Timestamp,
   trial_end: Timestamp,
@@ -21,6 +22,7 @@ export const CoverageRowSchema = z.object({
 export function toCoverage(row: unknown): Coverage {
   const r = CoverageRowSchema.parse(row);
   return {
+    ...(r.provider ? { provider: r.provider } : {}),
     status: r.status,
     currentPeriodEnd: r.current_period_end,
     trialEnd: r.trial_end,
@@ -33,7 +35,7 @@ export const SUBSCRIPTION_COLUMNS =
 
 const SubscriptionRowSchema = z.object({
   id: z.string(),
-  provider: z.enum(["stripe", "paystack", "manual"]),
+  provider: z.enum(["stripe", "paystack", "manual", "trial"]),
   provider_subscription_id: z.string().nullable(),
   provider_customer_id: z.string().nullable(),
   provider_meta: z.record(z.string(), z.unknown()),

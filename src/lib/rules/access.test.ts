@@ -144,6 +144,30 @@ describe("evaluateAccess", () => {
   });
 });
 
+describe("KinPrep free trial", () => {
+  const trialEnd = d("2026-10-08T10:00:00Z");
+
+  it("is active until it ends, then inactive with no grace", () => {
+    const trial = coverage({ provider: "trial", status: "trialing", trialEnd });
+    expect(evaluateAccess([trial], d("2026-10-07T00:00:00Z"))).toEqual({
+      state: "active",
+      until: trialEnd,
+    });
+    expect(evaluateAccess([trial], trialEnd).state).toBe("inactive");
+  });
+
+  it("falls back to the period end, and never covers when incomplete", () => {
+    const noTrialEnd = coverage({
+      provider: "trial",
+      status: "trialing",
+      currentPeriodEnd: trialEnd,
+    });
+    expect(evaluateAccess([noTrialEnd], d("2026-10-07T00:00:00Z")).until).toEqual(trialEnd);
+    const incomplete = coverage({ provider: "trial", status: "incomplete", trialEnd });
+    expect(evaluateAccess([incomplete], d("2026-10-07T00:00:00Z")).state).toBe("inactive");
+  });
+});
+
 describe("coverageWindow", () => {
   it("gives no paid time or grace for incomplete", () => {
     expect(coverageWindow(coverage({ status: "incomplete" }))).toEqual({

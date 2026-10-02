@@ -2,6 +2,8 @@ import type { Currency, PlanId } from "@/config/pricing";
 import type { Coverage, SubscriptionStatus } from "@/lib/rules/access";
 
 export type ProviderId = "stripe" | "paystack" | "manual";
+/** Providers as stored on subscriptions: the payment providers plus KinPrep's own free trial. */
+export type SubscriptionProvider = ProviderId | "trial";
 
 /** Who a checkout pays for: one student, or a number of seats for a group buyer. */
 export type CheckoutTarget =
@@ -39,7 +41,7 @@ export type WebhookResult = {
 /** A stored subscription, as providers need it to cancel or manage it. */
 export type SubscriptionRecord = {
   id: string;
-  provider: ProviderId;
+  provider: SubscriptionProvider;
   providerSubscriptionId: string | null;
   providerCustomerId: string | null;
   providerMeta: Record<string, unknown>;
@@ -53,7 +55,14 @@ export interface PaymentProvider {
   createCheckout(input: CheckoutInput): Promise<CheckoutResult>;
   /** Verifies the signature, then applies the event idempotently. Throws WebhookSignatureError. */
   handleWebhook(request: WebhookRequest): Promise<WebhookResult>;
-  cancel(subscription: SubscriptionRecord, context?: { actorId?: string }): Promise<void>;
+  /**
+   * Stops renewal. By default the time already paid for is kept; `immediately` ends it now
+   * (used before deleting a child's data, so nobody is billed for a deleted student).
+   */
+  cancel(
+    subscription: SubscriptionRecord,
+    context?: { actorId?: string; immediately?: boolean },
+  ): Promise<void>;
   /** A page where the payer can change their card or cancel; null if the provider has none. */
   getManageLink(subscription: SubscriptionRecord, returnUrl: string): Promise<string | null>;
 }
@@ -107,7 +116,7 @@ export type PaymentEntry = {
 };
 
 export type BillingUpdate = {
-  provider: ProviderId;
+  provider: SubscriptionProvider;
   event_id: string;
   event_type: string;
   occurred_at: string;
@@ -121,6 +130,8 @@ export type BillingUpdate = {
 export interface BillingStore {
   applyBillingEvent(update: BillingUpdate): Promise<"applied" | "duplicate">;
   getCoverages(studentId: string, at: Date): Promise<Coverage[]>;
+  /** True if the latest guardian consent event for the student is "granted". */
+  hasGuardianConsent(studentId: string): Promise<boolean>;
   hasAnySubscription(studentId: string): Promise<boolean>;
   getSubscription(id: string): Promise<SubscriptionRecord | null>;
   findSponsorLink(code: string): Promise<SponsoredStudent | null>;

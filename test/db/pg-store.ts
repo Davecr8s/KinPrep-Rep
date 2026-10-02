@@ -25,6 +25,13 @@ export function createPgBillingStore(db: PGlite): BillingStore {
       ]);
       return rows.map(toCoverage);
     },
+    async hasGuardianConsent(studentId) {
+      const { rows } = await db.query<{ event: string }>(
+        "select event from public.guardian_consents where student_id = $1 order by created_at desc limit 1",
+        [studentId],
+      );
+      return rows[0]?.event === "granted";
+    },
     async hasAnySubscription(studentId) {
       const { rows } = await db.query("select 1 from public.subscriptions where student_id = $1", [
         studentId,
