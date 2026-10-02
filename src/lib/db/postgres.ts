@@ -25,9 +25,10 @@ function wrap(sql: postgres.Sql | postgres.TransactionSql): Sql {
  * on Vercel; prepared statements are off because the pooler doesn't keep them.
  */
 export function appSql(): Sql {
-  client ??= postgres(serverEnv("database").SUPABASE_DB_URL, {
+  const env = serverEnv("database");
+  client ??= postgres(env.SUPABASE_DB_URL, {
     prepare: false,
-    max: 3,
+    max: env.SUPABASE_DB_POOL_MAX,
     idle_timeout: 20,
   });
   return wrap(client);

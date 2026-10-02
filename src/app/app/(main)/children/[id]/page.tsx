@@ -9,6 +9,7 @@ import { requirePayer } from "@/lib/auth";
 import { answerHistory, getChild, pendingConsentRequest } from "@/lib/data/children";
 import { childAccess } from "@/lib/data/status";
 import { EXAM_LABELS } from "@/lib/labels";
+import { todayPracticeUrl } from "@/lib/practice/server";
 import { lagosDay, weekStart } from "@/lib/rules/days";
 import {
   currentStreak,
@@ -54,6 +55,12 @@ export default async function ChildDashboard({
   const recent = answers.filter((a) => lagosDay(a.answeredAt) >= eightWeeks[0]!.weekStart);
   const note = typeof query.note === "string" ? NOTES[query.note] : undefined;
   const senior = isSeniorBirthYear(child.birth_year, now);
+  // Today's web practice link (signed, 24 hours): how a junior's daily link reaches the parent's
+  // phone, and a fallback for seniors when WhatsApp isn't working.
+  const practiceUrl =
+    isOwner && status.access.state !== "inactive" && !status.access.awaitingConsent
+      ? todayPracticeUrl(id, now)
+      : null;
   const daysToExam = child.exam_date
     ? Math.ceil(
         (Date.parse(`${child.exam_date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
@@ -97,6 +104,24 @@ export default async function ChildDashboard({
           Junior mode: {child.first_name} practises on a web page you open for them on your phone.
           We never message children under 13 on WhatsApp.
         </Notice>
+      )}
+
+      {practiceUrl && (
+        <Card>
+          <h2 className="font-semibold text-navy-dark">Today&apos;s practice</h2>
+          <p className={`${styles.hint} mt-1`}>
+            {senior
+              ? `If WhatsApp isn't working, ${child.first_name} can do today's questions on the web instead.`
+              : `Open it on your phone and hand it to ${child.first_name}. The link works for 24 hours.`}
+          </p>
+          {/* A plain link, not next/link: the page is a tiny HTML route, not part of the app. */}
+          <a
+            href={practiceUrl}
+            className={`${senior ? styles.secondaryButton : styles.primaryButton} mt-3 w-full`}
+          >
+            {senior ? "Practise on the web" : `Open ${child.first_name}'s practice`}
+          </a>
+        </Card>
       )}
 
       <Card>

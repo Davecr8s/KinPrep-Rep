@@ -33,3 +33,16 @@ describe("parseEnvGroup", () => {
     expect(() => parseEnvGroup("cron", { CRON_SECRET: "short" })).toThrow(/CRON_SECRET/);
   });
 });
+
+describe("database pool size", () => {
+  const url = "postgres://user:pass@host:6543/postgres";
+  it("defaults to 3, treats an empty value as unset, and allows 1-10", () => {
+    const pool = (value?: string) =>
+      parseEnvGroup("database", { SUPABASE_DB_URL: url, SUPABASE_DB_POOL_MAX: value })
+        .SUPABASE_DB_POOL_MAX;
+    expect(pool()).toBe(3);
+    expect(pool("")).toBe(3);
+    expect(pool("1")).toBe(1);
+    expect(() => pool("0")).toThrow(/SUPABASE_DB_POOL_MAX/);
+  });
+});

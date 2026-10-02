@@ -1,35 +1,33 @@
 import { getStudentAccess } from "@/lib/access";
 import type { Sql } from "@/lib/db/sql";
 import { SUBJECT_LABELS } from "@/lib/labels";
-import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
-import { currentStreak, weakestTopics, weekDots } from "@/lib/rules/progress";
-import { parseReply, parseText, replyIds, type Intent } from "./commands";
-import { prewrittenAlternative, type ExplainAnotherWay } from "./explain";
-import { LIMITS, truncate, type Outbound } from "./messages";
-import type { Outbox } from "./outbox";
+import {
+  advanceSet,
+  explanationFor,
+  leagueFor,
+  markAnswer,
+  setSummary,
+  startOrResumeSet,
+} from "@/lib/practice/engine";
+import { prewrittenAlternative, type ExplainAnotherWay } from "@/lib/practice/explain";
 import {
   accessStore,
   answerHistory,
-  createSession,
   getQuestion,
-  league,
-  logInbound,
-  pickQuestions,
-  questionsPerDay,
-  recordAnswer,
   sessionById,
-  setActiveStudent,
-  setOptedOut,
   sponsorCode,
-  studentsForPhone,
   takeEncouragements,
   todaySession,
-  touchContact,
-  updateSession,
-  type BotStudent,
+  type PracticeStudent,
   type Question,
   type Session,
-} from "./repo";
+} from "@/lib/practice/repo";
+import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
+import { currentStreak, weekDots } from "@/lib/rules/progress";
+import { parseReply, parseText, replyIds, type Intent } from "./commands";
+import { LIMITS, truncate, type Outbound } from "./messages";
+import type { Outbox } from "./outbox";
+import { logInbound, setActiveStudent, setOptedOut, studentsForPhone, touchContact } from "./repo";
 import type { InboundMessage } from "./webhook";
 
 // The senior-student WhatsApp bot. Students start each day themselves (START or the morning
@@ -172,20 +170,20 @@ export async function handleInbound(message: InboundMessage, deps: BotDeps): Pro
     return;
   }
   const active = consented.filter((x) => x.access.state !== "inactive").map((x) => x.s);
-  const isActive = (s: BotStudent) => active.some((a) => a.id === s.id);
+  const isActive = (s: PracticeStudent) => active.some((a) => a.id === s.id);
 
   if (intent.type === "command" && intent.command === "HELP") {
     await send(text(COPY.help));
     return;
   }
 
-  const sendSponsorLink = async (s: BotStudent) => {
+  const sendSponsorLink = async (s: PracticeStudent) => {
     const code = await sponsorCode(sql, s.id);
     await send(text(COPY.sponsor(s.first_name, `${deps.appUrl}/sponsor/${code}`)), s.id);
   };
 
   // Which student is this?
-  let student: BotStudent | undefined;
+  let student: PracticeStudent | undefined;
   let starting = intent.type === "command" && intent.command === "START";
   if (intent.type === "pick") {
     student = consented.find((x) => x.s.id === intent.studentId)?.s;
@@ -219,13 +217,13 @@ export async function handleInbound(message: InboundMessage, deps: BotDeps): Pro
   await setActiveStudent(sql, phone, student.id, endOfLagosDay(now));
 
   const day = lagosDay(now);
-  const current: BotStudent = student;
+  const current: PracticeStudent = student;
   const ctx = { ...deps, phone, student: current, day, send: (m: Outbound) => send(m, current.id) };
 
   if (starting) return startOrResume(ctx);
   switch (intent.type) {
     case "answer": {
-      const session = await todaySession(sql, student.id, day);
+      const session = await todaySession(sql, student.id, "whatsapp", day);
       if (session && !session.completed_at && session.awaiting === "answer") {
         return answer(ctx, session, session.position, intent.option);
       }
@@ -245,7 +243,7 @@ export async function handleInbound(message: InboundMessage, deps: BotDeps): Pro
         return explainAgain(ctx, session, intent.position);
       }
       // An old button: carry on from where they really are.
-      return resume(ctx, await todaySession(sql, student.id, day));
+      return resume(ctx, await todaySession(sql, student.id, "whatsapp", day));
     }
     case "command":
       if (intent.command === "SCORE") return score(ctx);
@@ -267,7 +265,7 @@ export async function handleInbound(message: InboundMessage, deps: BotDeps): Pro
 
 type Ctx = BotDeps & {
   phone: string;
-  student: BotStudent;
+  student: PracticeStudent;
   day: string;
   send: (m: Outbound) => Promise<unknown>;
 };
@@ -278,19 +276,19 @@ async function startOrResume(ctx: Ctx): Promise<void> {
   if (notes.length > 0) {
     await ctx.send(text(`💬 A message from home:\n\n${notes.map((n) => `"${n}"`).join("\n\n")}`));
   }
-  let session = await todaySession(sql, student.id, day);
-  if (!session) {
-    const ids = await pickQuestions(sql, student, await questionsPerDay(sql));
-    if (ids.length === 0) {
-      await ctx.send(text(COPY.noQuestions));
-      return;
-    }
-    session = await createSession(sql, student.id, day, ids, now);
+  const set = await startOrResumeSet(sql, student, "whatsapp", day, now);
+  if (set.kind === "noQuestions") {
+    await ctx.send(text(COPY.noQuestions));
+    return;
+  }
+  if (set.kind === "started") {
     await ctx.send(
-      text(`Hi ${student.first_name}! Today's set has ${ids.length} questions. Let's go 💪`),
+      text(
+        `Hi ${student.first_name}! Today's set has ${set.session.question_ids.length} questions. Let's go 💪`,
+      ),
     );
   }
-  return resume(ctx, session);
+  return resume(ctx, set.session);
 }
 
 async function resume(ctx: Ctx, session: Session | null): Promise<void> {
@@ -333,29 +331,27 @@ function nextButton(session: Session) {
 }
 
 async function answer(ctx: Ctx, session: Session, position: number, option: number): Promise<void> {
-  const q = await getQuestion(ctx.sql, session.question_ids[position]!);
-  if (option >= q.options.length) {
+  const marked = await markAnswer(ctx.sql, {
+    session,
+    studentId: ctx.student.id,
+    position,
+    option,
+    now: ctx.now,
+  });
+  if (marked.kind === "stale") {
+    return resume(ctx, await todaySession(ctx.sql, ctx.student.id, "whatsapp", ctx.day));
+  }
+  const q = marked.question;
+  if (marked.kind === "invalidOption") {
     await ctx.send(text(`Please choose ${LETTERS.slice(0, q.options.length).join(", ")}.`));
     return;
   }
-  const correct = option === q.answer_index;
-  await recordAnswer(ctx.sql, {
-    sessionId: session.id,
-    studentId: ctx.student.id,
-    questionId: q.id,
-    chosen: option,
-    correct,
-    at: ctx.now,
-  });
-  await updateSession(ctx.sql, session.id, { position, awaiting: "next" });
-  const verdict = correct
+  const verdict = marked.correct
     ? "✅ Correct!"
     : `❌ Not quite. The answer is ${LETTERS[q.answer_index]}) ${q.options[q.answer_index]}.`;
-  const explanation =
-    ctx.student.language === "pcm" ? (q.explanation_pcm ?? q.explanation_en) : q.explanation_en;
   await ctx.send({
     kind: "buttons",
-    text: truncate(`${verdict}\n\n${explanation}`, LIMITS.body),
+    text: truncate(`${verdict}\n\n${explanationFor(q, ctx.student.language)}`, LIMITS.body),
     buttons: [
       nextButton({ ...session, position }),
       { id: replyIds.explainAgain(session.id, position), title: "Explain another way" },
@@ -376,35 +372,25 @@ async function explainAgain(ctx: Ctx, session: Session, position: number): Promi
 }
 
 async function advance(ctx: Ctx, session: Session): Promise<void> {
-  const next = session.position + 1;
-  if (next < session.question_ids.length) {
-    await updateSession(ctx.sql, session.id, { position: next, awaiting: "answer" });
-    return sendQuestion(ctx, { ...session, position: next, awaiting: "answer" }, next);
+  const moved = await advanceSet(ctx.sql, session, session.position, ctx.now);
+  if (moved.kind === "stale") {
+    return resume(ctx, await todaySession(ctx.sql, ctx.student.id, "whatsapp", ctx.day));
   }
-  await updateSession(ctx.sql, session.id, {
-    position: session.position,
-    awaiting: "next",
-    completedAt: ctx.now,
-  });
+  if (moved.kind === "question") return sendQuestion(ctx, moved.session, moved.session.position);
   // Free the number for a sibling.
   await setActiveStudent(ctx.sql, ctx.phone, null, null);
-  const history = await answerHistory(
-    ctx.sql,
-    ctx.student.id,
-    lagosDayStart(addDays(ctx.day, -120)),
-  );
-  const today = history.filter((a) => a.sessionId === session.id);
-  const focus = weakestTopics(
-    history.filter((a) => lagosDay(a.answeredAt) >= addDays(ctx.day, -28)),
-    { minAttempts: 2, limit: 1 },
-  )[0];
+  const summary = await setSummary(ctx.sql, ctx.student.id, session.id, ctx.day);
   const lines = [
     `🎉 Well done, ${ctx.student.first_name}! You finished today's set.`,
     "",
-    `Score: ${today.filter((a) => a.correct).length}/${today.length}`,
-    `Streak: ${currentStreak(history, ctx.day)} ${currentStreak(history, ctx.day) === 1 ? "day" : "days"} 🔥`,
+    `Score: ${summary.correct}/${summary.answered}`,
+    `Streak: ${summary.streak} ${summary.streak === 1 ? "day" : "days"} 🔥`,
   ];
-  if (focus) lines.push(`Tomorrow's focus: ${focus.topic} (${SUBJECT_LABELS[focus.subject]})`);
+  if (summary.focus) {
+    lines.push(
+      `Tomorrow's focus: ${summary.focus.topic} (${SUBJECT_LABELS[summary.focus.subject]})`,
+    );
+  }
   lines.push("", "Send LEAGUE to see how you rank this week.");
   await ctx.send(text(lines.join("\n")));
 }
@@ -442,12 +428,13 @@ async function streak(ctx: Ctx): Promise<void> {
 }
 
 async function showLeague(ctx: Ctx): Promise<void> {
-  const rows = await league(ctx.sql, ctx.student.id, lagosDayStart(weekStart(ctx.day)));
+  const result = await leagueFor(ctx.sql, ctx.student, ctx.day);
+  if (!result) return; // juniors only; they never reach the bot
+  const { rows, scope } = result;
   const lines = rows
     .slice(0, 5)
     .map((r, i) => `${i + 1}. ${r.first_name} ${r.last_initial}. – ${r.correct} correct`);
   const myRank = rows.findIndex((r) => r.student_id === ctx.student.id);
   if (myRank >= 5) lines.push("…", `${myRank + 1}. You – ${rows[myRank]!.correct} correct`);
-  const scope = ctx.student.group_account_id ? "your group" : `${ctx.student.class} students`;
   await ctx.send(text(`🏆 This week's league (${scope})\n\n${lines.join("\n")}`));
 }

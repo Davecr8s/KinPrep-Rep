@@ -45,9 +45,19 @@ export const envGroups = {
     // Approved template with a "Start" quick-reply button, for the morning nudge.
     WHATSAPP_TEMPLATE_MORNING: z.string().min(1).optional(),
   }),
-  // Direct Postgres for the WhatsApp bot (transaction pooler URL, port 6543).
+  // Signs the web practice links (/p/<token>). Changing it invalidates every link issued.
+  practice: z.object({
+    PRACTICE_LINK_SECRET: z.string().min(32),
+  }),
+  // Direct Postgres for the WhatsApp bot and the web practice page (transaction pooler, port 6543).
   database: z.object({
     SUPABASE_DB_URL: z.string().startsWith("postgres"),
+    // Connections per server instance. The end-to-end tests use 1 (their PGlite server can't
+    // interleave connections).
+    SUPABASE_DB_POOL_MAX: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z.coerce.number().int().min(1).max(10).default(3),
+    ),
   }),
   llm: z.object({
     LLM_API_KEY: secret,

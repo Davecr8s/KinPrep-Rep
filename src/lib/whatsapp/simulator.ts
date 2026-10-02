@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/db/sql";
-import type { ExplainAnotherWay } from "./explain";
+import type { ExplainAnotherWay } from "@/lib/practice/explain";
 import { enqueueInbound, processJobs } from "./jobs";
 import type { Outbound } from "./messages";
 import { createOutbox, simulatedTransport } from "./outbox";

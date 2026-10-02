@@ -1,7 +1,8 @@
 import { isStudentActive } from "@/lib/access";
 import type { Sql } from "@/lib/db/sql";
 import type { Outbox } from "./outbox";
-import { accessStore, studentsForPhone } from "./repo";
+import { accessStore } from "@/lib/practice/repo";
+import { studentsForPhone } from "./repo";
 
 /**
  * The morning nudge: the approved template (with a "Start" quick reply) to every number with at

@@ -4,7 +4,7 @@ import { questionMessages } from "./bot";
 import { parseReply, parseText, replyIds } from "./commands";
 import { assertValid, toCloudPayload, truncate } from "./messages";
 import { cloudTransport } from "./outbox";
-import type { Question, Session } from "./repo";
+import type { Question, Session } from "@/lib/practice/repo";
 import { fakeWebhookBody, parseInbound, verifyMetaSignature } from "./webhook";
 import { canSendFreeform } from "./window";
 
