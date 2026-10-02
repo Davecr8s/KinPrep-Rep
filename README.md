@@ -3,7 +3,7 @@
 Exam coaching for Nigerian secondary-school students, paid for by the adults who fund their education.
 
 - Product brief and rules that must never be broken: [CLAUDE.md](CLAUDE.md)
-- Phase-by-phase build plan: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md)
+- Phase-by-phase build plan and status: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md)
 
 ## Getting started
 
@@ -12,6 +12,8 @@ Requires Node.js 24 (see `.nvmrc`).
 ```sh
 npm install
 cp .env.example .env.local   # fill in values as each phase needs them
+npm run db:push              # apply supabase/migrations to the Supabase project
+npm run seed:dev             # fake demo data + a sponsor link to try checkout
 npm run dev                  # http://localhost:3000
 ```
 
@@ -21,22 +23,31 @@ npm run dev                  # http://localhost:3000
 | ----------------------------- | ----------------------------------------------------------------------------------------- |
 | `npm run dev`                 | Development server                                                                        |
 | `npm run build` / `npm start` | Production build and server                                                               |
-| `npm run check`               | Format check, lint, typecheck and unit tests (run before pushing)                         |
-| `npm test`                    | Unit tests (Vitest)                                                                       |
-| `npm run test:coverage`       | Unit tests with coverage; business rules must reach 100%                                  |
+| `npm run check`               | Format check, lint, typecheck and all tests (run before pushing)                          |
+| `npm test`                    | Unit and database tests (Vitest; the database tests run in PGlite, no server needed)      |
+| `npm run test:coverage`       | Tests with coverage; business rules must reach 100%                                       |
 | `npm run test:e2e`            | End-to-end tests (Playwright, mobile Chrome). First run `npx playwright install chromium` |
 | `npm run format`              | Format all files with Prettier                                                            |
+| `npm run db:push`             | Apply migrations to the database in `SUPABASE_DB_URL`                                     |
+| `npm run seed:dev`            | Create fake development data and print a sponsor link                                     |
+| `npm run paystack:plans`      | Create the naira plans in Paystack and print their codes                                  |
 
 ## Layout
 
-| Path                    | Contents                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `src/config/`           | Prices, trial and grace periods, pilot settings, go/stop thresholds. The only place these values live. |
-| `src/lib/env.ts`        | Server-only environment variables, validated with Zod, grouped by integration                          |
-| `src/lib/rules/`        | Pure business rules such as `isStudentActive`, streaks and WhatsApp window checks (Phase 2)            |
-| `src/app/(payer)/app/`  | Payer web app (Phase 3)                                                                                |
-| `src/app/admin/`        | Admin and reviewer console (Phase 5)                                                                   |
-| `src/app/p/[token]/`    | Web practice page for junior students (Phase 6)                                                        |
-| `src/app/api/webhooks/` | Stripe, Paystack and WhatsApp webhooks (Phases 4 and 8)                                                |
-| `supabase/`             | Database config and migrations (Phase 1)                                                               |
-| `e2e/`                  | Playwright tests                                                                                       |
+| Path                      | Contents                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `src/config/`             | Prices, trial and grace periods, pilot settings, go/stop thresholds. The only place these values live. |
+| `src/lib/env.ts`          | Server-only environment variables, validated with Zod, grouped by integration                          |
+| `src/lib/rules/`          | Pure business rules, fully tested. `access.ts`: when a subscription gives access                       |
+| `src/lib/access.ts`       | `isStudentActive(studentId)`: the single source of truth for access                                    |
+| `src/lib/payments/`       | `PaymentProvider` interface with Stripe, Paystack and Manual implementations; webhook handling         |
+| `src/app/api/webhooks/`   | Stripe and Paystack webhook endpoints                                                                  |
+| `src/app/sponsor/[code]/` | "Get sponsored" page: starts Stripe Checkout for one student                                           |
+| `supabase/migrations/`    | Database schema, RLS policies and billing functions                                                    |
+| `test/`                   | Database and end-to-end payment tests (PGlite), shared test helpers                                    |
+| `scripts/`                | Database push, dev seed, Paystack plan setup                                                           |
+| `e2e/`                    | Playwright tests                                                                                       |
+
+## Payments in one paragraph
+
+Code outside `src/lib/payments` never talks to Stripe or Paystack. It calls `getPaymentProvider("stripe" | "paystack" | "manual")`. Each webhook is signature-checked, turned into a provider-neutral update, and applied by the Postgres function `apply_billing_event`. That function records the event id (so a replay changes nothing), updates the subscription and writes the `payments` ledger, all in one transaction. Access is decided only by `isStudentActive`, which looks at every subscription and group seat covering the student, including the 3-day grace period.

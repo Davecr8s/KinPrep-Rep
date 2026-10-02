@@ -10,6 +10,8 @@ const secret = z.string().min(1);
 export const envGroups = {
   app: z.object({
     NEXT_PUBLIC_APP_URL: z.url(),
+  }),
+  cron: z.object({
     CRON_SECRET: z.string().min(32),
   }),
   supabase: z.object({
@@ -22,6 +24,9 @@ export const envGroups = {
   }),
   paystack: z.object({
     PAYSTACK_SECRET_KEY: z.string().startsWith("sk_"),
+    // Plan codes for recurring card subscriptions; create them with scripts/paystack-plans.ts.
+    PAYSTACK_PLAN_NIGERIA_WEEKLY: z.string().startsWith("PLN_").optional(),
+    PAYSTACK_PLAN_NIGERIA_MONTHLY: z.string().startsWith("PLN_").optional(),
   }),
   whatsapp: z.object({
     WHATSAPP_ACCESS_TOKEN: secret,

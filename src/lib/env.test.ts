@@ -30,8 +30,6 @@ describe("parseEnvGroup", () => {
   });
 
   it("rejects a short cron secret", () => {
-    expect(() =>
-      parseEnvGroup("app", { NEXT_PUBLIC_APP_URL: "https://kinprep.test", CRON_SECRET: "short" }),
-    ).toThrow(/CRON_SECRET/);
+    expect(() => parseEnvGroup("cron", { CRON_SECRET: "short" })).toThrow(/CRON_SECRET/);
   });
 });

@@ -4,10 +4,11 @@ Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The
 
 ## Status
 
-| Phase                      | State             | Notes                                                                           |
-| -------------------------- | ----------------- | ------------------------------------------------------------------------------- |
-| 0. Tooling and foundations | Done (2026-10-02) | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green |
-| 1. Data model and security | Next              | Waiting on decision 5 (hosted Supabase or local Docker)                         |
+| Phase                      | State                 | Notes                                                                                                                                                            |
+| -------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0. Tooling and foundations | Done (2026-10-02)     | Repo: github.com/Davecr8s/KinPrep-Rep · Live: kinprep-rep.vercel.app · CI green                                                                                  |
+| 1. Data model and security | Partly done           | Core, consent, audit and billing tables with RLS. Question bank, practice and WhatsApp tables follow in their own phases. Not yet applied to the hosted project. |
+| 4. Payments                | Built, offline-tested | Stripe, Paystack and Manual behind one interface; sponsor links; referral codes. Live check with test keys still to do (see "Payments setup").                   |
 
 ## Start these now (they take weeks and don't depend on code)
 
@@ -20,12 +21,22 @@ Phase-by-phase plan to take KinPrep from an empty folder to a running pilot. The
 
 ## Decisions needed before the phases that use them
 
-1. **Under-13 rule with birth year only (Phase 1).** We store the birth year, not a full date, so a child born in 2013 could be 12 or 13 during 2026. Recommendation: treat a student as 13+ only when `current_year - birth_year >= 14`. Otherwise they are junior: web page only, no WhatsApp.
-2. **Naira renewals by transfer or USSD (Phase 4).** Paystack recurring subscriptions only work with cards. Transfer and USSD payers would need a renewal payment link sent before each period ends. The grace period covers late payments.
+1. **Under-13 rule with birth year only (Phase 1).** We store the birth year, not a full date, so a child born in 2013 could be 12 or 13 during 2026. Recommendation: treat a student as 13+ only when `current_year - birth_year >= 14`. Otherwise they are junior: web page only, no WhatsApp. _Implemented as recommended (database trigger on `students`); still awaiting confirmation._
+2. **Naira renewals by transfer or USSD (Phase 4).** _Decided 2026-10-02: pay-per-period._ Cards renew through Paystack subscriptions; each transfer or USSD payment buys one week or month, and the 3-day grace period covers late payers. Renewal reminders come with the payer app.
 3. **Payer sign-in (Phase 3).** Email magic link (cheapest, simplest) or phone OTP (more natural in Nigeria, but costs per SMS).
 4. **AI explanations (Phase 7).** Generate them live, or generate them ahead of time so a teacher approves them alongside the question (safer, cheaper, works offline from the LLM). Also pick the LLM provider.
-5. **Local database (Phase 0).** Local Supabase needs Docker Desktop. The alternative is a hosted Supabase "dev" project.
-6. **USD and CAD price points, and the time on Sunday that payer reports go out (Phase 9).**
+5. **Local database (Phase 0).** _Decided 2026-10-02: hosted Supabase dev project_ (`ngfioqnicgtwyfxpzkvm`). Tests run the migrations in PGlite, an in-process Postgres, so they need no database.
+6. **USD and CAD price points, and the time on Sunday that payer reports go out (Phase 9).** _Prices: the provisional ones in `src/config/pricing.ts` are in use for now._ Report time still open.
+7. **Free trial for naira payers (Phase 3).** Stripe checkouts include the 7-day trial. Paystack has no built-in trial, so Nigerian payers currently pay from day one. Option: grant a 7-day app-level trial at sign-up.
+
+## Payments setup (to finish the Phase 4 "Done when")
+
+1. In `.env.local`: `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `STRIPE_SECRET_KEY` (test mode), then `npm run db:push` and `npm run seed:dev`.
+2. Local webhooks: `stripe listen --latest --forward-to localhost:3000/api/webhooks/stripe` and copy the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`. The code expects Stripe API version `2026-09-30.endive` (the SDK's), so a dashboard endpoint must use that version too.
+3. `npm run dev`, open the sponsor link from `seed:dev`, pay with card 4242 4242 4242 4242: the student becomes active (trial).
+4. Failed renewal: run another checkout (new seed student, or cancel the first) with card 4000 0000 0000 0341, which saves fine but fails when charged. In the Stripe dashboard open the subscription and choose "End trial now": the charge fails, the student moves to grace, and `isStudentActive` turns false 3 days later.
+5. Replay: `stripe events resend <evt_id>` returns `{"status":"duplicate"}` and changes nothing.
+6. Paystack (test keys): `npm run paystack:plans`, paste the printed plan codes into `.env.local`, and point the Paystack test webhook at `/api/webhooks/paystack`.
 
 ---
 

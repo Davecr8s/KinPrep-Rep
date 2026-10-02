@@ -2,6 +2,8 @@
 
 # KinPrep: Project Brief
 
+(This file is the project brief; instructions that mention PROJECT_BRIEF.md mean this file.)
+
 Build plan and current phase: see [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md).
 
 ## What it is

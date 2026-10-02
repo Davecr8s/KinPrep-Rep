@@ -11,7 +11,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
+    // Each database test file boots its own in-process Postgres (PGlite).
+    testTimeout: 20_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       include: ["src/lib/rules/**", "src/config/**"],
