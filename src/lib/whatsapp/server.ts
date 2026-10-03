@@ -1,4 +1,5 @@
 import "server-only";
+import { productionExplainer } from "@/lib/ai/server";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
 import { processJobs } from "./jobs";
@@ -22,7 +23,11 @@ export function runPendingJobs(options: { phone?: string; limit?: number } = {})
   const appUrl = serverEnv("app").NEXT_PUBLIC_APP_URL;
   return processJobs(
     sql,
-    (job) => ({ outbox: createOutbox({ sql, transport: transportFor(job.simulated) }), appUrl }),
+    (job) => ({
+      outbox: createOutbox({ sql, transport: transportFor(job.simulated) }),
+      appUrl,
+      explainAnotherWay: productionExplainer(),
+    }),
     options,
   );
 }

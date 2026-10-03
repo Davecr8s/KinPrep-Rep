@@ -1,4 +1,5 @@
 import "server-only";
+import { productionExplainer } from "@/lib/ai/server";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
 import { practiceUrl, signPracticeLink } from "./links";
@@ -12,6 +13,7 @@ export function webDeps(now: Date = new Date()): WebDeps {
     secret: serverEnv("practice").PRACTICE_LINK_SECRET,
     appUrl: serverEnv("app").NEXT_PUBLIC_APP_URL,
     now,
+    explainAnotherWay: productionExplainer(),
   };
 }
 

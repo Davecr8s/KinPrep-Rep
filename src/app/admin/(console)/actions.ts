@@ -15,6 +15,7 @@ import {
 } from "@/lib/admin/money";
 import { createPaystackRecipient, payoutClients, stripeOnboarding } from "@/lib/admin/server";
 import { changeClass, mergeStudents, pauseStudent, resumeStudent } from "@/lib/admin/students";
+import { flagExplanation } from "@/lib/ai/admin";
 import { requireAdmin } from "@/lib/auth";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
@@ -243,6 +244,17 @@ export async function batchAction(id: string, formData: FormData): Promise<never
   go(path, { error: "Choose what to do." });
 }
 
+// ---- AI explanations -----------------------------------------------------------------
+
+export async function flagExplanationAction(id: string, formData: FormData): Promise<never> {
+  const path = "/admin/ai";
+  const a = await admin(path);
+  await attempt(path, () =>
+    flagExplanation(appSql(), a, id, String(formData.get("reason") ?? ""), new Date()),
+  );
+  go(path, { done: "Flagged: it won't be shown again; the next request makes a new one." });
+}
+
 // ---- Settings --------------------------------------------------------------------------
 
 export async function saveSettingsAction(formData: FormData): Promise<never> {
@@ -260,6 +272,7 @@ export async function saveSettingsAction(formData: FormData): Promise<never> {
     graceDays: formData.get("graceDays"),
     waPerSecond: formData.get("waPerSecond"),
     waPerDay: formData.get("waPerDay"),
+    aiPerDay: formData.get("aiPerDay"),
     prices,
   });
   if (!parsed.success) go(path, { error: parsed.error.issues[0]!.message });

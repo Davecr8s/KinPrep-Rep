@@ -226,7 +226,14 @@ export async function practiceGet(token: string, url: URL, deps: WebDeps): Promi
       chosen: answer?.chosen ?? -1,
       correct: answer?.correct ?? false,
       explanation: explanationFor(question, student.language),
-      alternative: wantsAlt ? await explain({ question, language: student.language }) : undefined,
+      alternative: wantsAlt
+        ? await explain({
+            question,
+            language: student.language,
+            studentId: student.id,
+            chosenIndex: answer?.chosen ?? null,
+          })
+        : undefined,
     }),
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/payments/billing-settings";
 import { questionsPerDay } from "@/lib/practice/repo";
 import { lagosDay } from "@/lib/rules/days";
+import { aiExplanationsPerDay } from "@/lib/ai/explain";
 import { audit, AdminError, type Admin } from "./common";
 import { handSentText, waMeLink } from "./rules";
 
@@ -26,6 +27,7 @@ export type AdminSettings = {
   streakThreshold: number;
   waPerSecond: number;
   waPerDay: number;
+  aiPerDay: number;
   billing: BillingSettings;
 };
 
@@ -40,6 +42,7 @@ export async function readSettings(sql: Sql): Promise<AdminSettings> {
     streakThreshold: await streakThreshold(sql),
     waPerSecond: limits.perSecond,
     waPerDay: limits.perDay,
+    aiPerDay: await aiExplanationsPerDay(sql),
     billing: billingSettingsFrom(
       await sql.query(
         "select key, value from public.settings where key in ('price_overrides', 'grace_days')",
@@ -61,6 +64,7 @@ export const SettingsInputSchema = z.object({
   graceDays: z.coerce.number().int().min(0).max(MAX_GRACE_DAYS),
   waPerSecond: z.coerce.number().int().min(1).max(80),
   waPerDay: z.coerce.number().int().min(1).max(100_000),
+  aiPerDay: z.coerce.number().int().min(0).max(50),
   prices: z.record(z.string(), z.record(z.string(), priceField)),
 });
 export type SettingsInput = z.output<typeof SettingsInputSchema>;
@@ -85,6 +89,7 @@ export async function saveSettings(sql: Sql, admin: Admin, input: SettingsInput)
     grace_days: input.graceDays,
     wa_messages_per_second: input.waPerSecond,
     wa_messages_per_day: input.waPerDay,
+    ai_explanations_per_day: input.aiPerDay,
     price_overrides: priceOverrides(prices),
   };
   await sql.transaction(async (tx) => {

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { productionExplainer } from "@/lib/ai/server";
 import { requireAdmin } from "@/lib/auth";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
@@ -20,7 +21,7 @@ async function run(phone: string, input: Omit<SimulatedInput, "phone">): Promise
   await requireAdmin(PAGE);
   await simulateInbound(
     appSql(),
-    { appUrl: serverEnv("app").NEXT_PUBLIC_APP_URL },
+    { appUrl: serverEnv("app").NEXT_PUBLIC_APP_URL, explainAnotherWay: productionExplainer() },
     { phone, ...input },
   );
   redirect(`${PAGE}?phone=${encodeURIComponent(phone)}#end`);

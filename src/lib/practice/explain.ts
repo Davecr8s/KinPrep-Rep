@@ -2,12 +2,15 @@ import type { Question } from "./repo";
 
 /**
  * "Explain another way" for the current question only (CLAUDE.md: the AI never chats freely).
- * The AI version comes with Prompt 10 / Phase 7; until then this uses the teacher-written
- * explanation in the student's other language.
+ * The AI version is src/lib/ai/explain.ts (aiExplainer); this one, the teacher-written
+ * explanation in the student's other language, is its fallback.
  */
 export type ExplainAnotherWay = (input: {
   question: Question;
   language: "en" | "pcm";
+  /** Who asked (for the AI's daily limit), and the option they chose, if any. */
+  studentId?: string;
+  chosenIndex?: number | null;
 }) => Promise<string>;
 
 export const prewrittenAlternative: ExplainAnotherWay = async ({ question, language }) => {

@@ -90,6 +90,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/admin/s
           "Stay well inside Meta's limit.",
         )}
         {number(
+          "aiPerDay",
+          "AI explanations per student per day",
+          s.aiPerDay,
+          0,
+          50,
+          "After that, “Explain another way” shows the teacher's explanation. 0 turns the AI off.",
+        )}
+        {number(
           "waPerDay",
           "WhatsApp messages per day",
           s.waPerDay,

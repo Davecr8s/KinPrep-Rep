@@ -426,6 +426,7 @@ describe("settings", () => {
       graceDays: 5,
       waPerSecond: 5,
       waPerDay: 500,
+      aiPerDay: 3,
       prices: { nigeria_weekly: { NGN: 600 }, abroad_monthly: { GBP: 6, USD: 9 } },
     });
     const after = await readSettings(sql);
@@ -435,6 +436,7 @@ describe("settings", () => {
       streakThreshold: 6,
       waPerSecond: 5,
       waPerDay: 500,
+      aiPerDay: 3,
     });
     expect(after.billing.graceDays).toBe(5);
     expect(after.billing.prices.nigeria_weekly.NGN).toBe(60_000);

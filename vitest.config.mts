@@ -27,6 +27,7 @@ export default defineConfig({
         "src/lib/bank/rules.ts",
         "src/lib/admin/rules.ts",
         "src/lib/payments/billing-settings.ts",
+        "src/lib/ai/rules.ts",
       ],
       exclude: ["**/*.test.ts"],
       // Business rules and the engine's decisions must be fully tested (CLAUDE.md, Phase 2).
@@ -37,6 +38,7 @@ export default defineConfig({
         "src/lib/bank/rules.ts": { lines: 100, branches: 100, functions: 100 },
         "src/lib/admin/rules.ts": { lines: 100, branches: 100, functions: 100 },
         "src/lib/payments/billing-settings.ts": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/ai/rules.ts": { lines: 100, branches: 100, functions: 100 },
       },
     },
   },

@@ -15,6 +15,7 @@ const NAV = [
   ["/admin/pilot", "Pilot console"],
   ["/admin/ambassadors", "Ambassadors"],
   ["/admin/messages", "Messages"],
+  ["/admin/ai", "AI explanations"],
   ["/admin/settings", "Settings"],
   ["/admin/questions", "Question bank"],
 ] as const;

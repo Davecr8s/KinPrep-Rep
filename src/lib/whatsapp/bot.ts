@@ -14,6 +14,7 @@ import {
   accessStore,
   answerHistory,
   getQuestion,
+  recordedAnswer,
   sessionById,
   sponsorCode,
   takeEncouragements,
@@ -330,7 +331,13 @@ async function answer(ctx: Ctx, session: Session, position: number, option: numb
 async function explainAgain(ctx: Ctx, session: Session, position: number): Promise<void> {
   const q = await getQuestion(ctx.sql, session.question_ids[position]!);
   const explain = ctx.explainAnotherWay ?? prewrittenAlternative;
-  const body = await explain({ question: q, language: ctx.student.language });
+  const chosen = await recordedAnswer(ctx.sql, session.id, q.id);
+  const body = await explain({
+    question: q,
+    language: ctx.student.language,
+    studentId: ctx.student.id,
+    chosenIndex: chosen?.chosen ?? null,
+  });
   const current = await sessionById(ctx.sql, session.id, ctx.student.id);
   await ctx.send(
     current && current.awaiting === "next" && current.position === position && !current.completed_at
