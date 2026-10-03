@@ -15,9 +15,11 @@ const VIEWER_INVITE_DAYS = 7;
 
 export async function updateReportSettings(formData: FormData): Promise<never> {
   const { user, payer } = await requirePayer();
+  // One "weekday-hour" choice, e.g. "0-9" for Sunday 09:00 in the payer's timezone.
+  const [reportWeekday, reportHour] = String(formData.get("reportTime") ?? "").split("-");
   const parsed = ReportSettingsSchema.safeParse({
-    reportWeekday: formData.get("reportWeekday"),
-    reportHour: formData.get("reportHour"),
+    reportWeekday,
+    reportHour,
     whatsapp: formData.get("whatsapp"),
     reportsOptIn: formData.get("reportsOptIn"),
     country: payer.region === "nigeria" ? "NG" : "GB",

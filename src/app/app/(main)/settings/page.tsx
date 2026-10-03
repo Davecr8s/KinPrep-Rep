@@ -5,6 +5,7 @@ import { PLANS, type PlanId } from "@/config/pricing";
 import { requirePayer } from "@/lib/auth";
 import { childSubscriptions, listChildren, type SubscriptionSummary } from "@/lib/data/children";
 import { serverEnv } from "@/lib/env";
+import { REPORT_TIMES } from "@/config/messaging";
 import { hourLabel, WEEKDAYS } from "@/lib/labels";
 import { PLAN_LABELS } from "@/lib/payments/plans";
 import { userDb } from "@/lib/supabase/server";
@@ -128,32 +129,24 @@ export default async function SettingsPage({ searchParams }: PageProps<"/app/set
           </div>
         )}
         <form action={updateReportSettings} className="mt-3 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1">
-              <span className={styles.label}>Day</span>
-              <select
-                name="reportWeekday"
-                defaultValue={payer.report_weekday}
-                className={styles.input}
-              >
-                {WEEKDAYS.map((d, i) => (
-                  <option key={d} value={i}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={styles.label}>Time</span>
-              <select name="reportHour" defaultValue={payer.report_hour} className={styles.input}>
-                {Array.from({ length: 24 }, (_, h) => (
-                  <option key={h} value={h}>
-                    {hourLabel(h)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="flex flex-col gap-1">
+            <span className={styles.label}>When</span>
+            <select
+              name="reportTime"
+              defaultValue={`${payer.report_weekday}-${payer.report_hour}`}
+              className={styles.input}
+            >
+              {[REPORT_TIMES.saturday, REPORT_TIMES.sunday].flatMap((d) =>
+                Array.from({ length: d.toHour - d.fromHour + 1 }, (_, i) => d.fromHour + i).map(
+                  (h) => (
+                    <option key={`${d.weekday}-${h}`} value={`${d.weekday}-${h}`}>
+                      {WEEKDAYS[d.weekday]} {hourLabel(h)}
+                    </option>
+                  ),
+                ),
+              )}
+            </select>
+          </label>
           <p className={styles.hint}>In your timezone ({payer.timezone.replaceAll("_", " ")}).</p>
           <label className="flex flex-col gap-1">
             <span className={styles.label}>Your WhatsApp number</span>
@@ -178,7 +171,10 @@ export default async function SettingsPage({ searchParams }: PageProps<"/app/set
               defaultChecked={payer.whatsapp_reports_opt_in_at !== null}
               className="mt-1 size-5 shrink-0 accent-navy"
             />
-            <span>Send the weekly report to me on WhatsApp</span>
+            <span>
+              Send KinPrep messages to me on WhatsApp: the weekly report, a junior&apos;s daily
+              practice link and alerts if a child stops practising. Otherwise they come by email.
+            </span>
           </label>
           <button className={styles.secondaryButton}>Save</button>
         </form>

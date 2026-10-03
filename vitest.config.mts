@@ -23,12 +23,14 @@ export default defineConfig({
         "src/lib/engine/select.ts",
         "src/lib/engine/mastery.ts",
         "src/lib/engine/runway.ts",
+        "src/lib/jobs/rules.ts",
       ],
       exclude: ["**/*.test.ts"],
       // Business rules and the engine's decisions must be fully tested (CLAUDE.md, Phase 2).
       thresholds: {
         "src/lib/rules/**": { lines: 100, branches: 100, functions: 100 },
         "src/lib/engine/{select,mastery,runway}.ts": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/jobs/rules.ts": { lines: 100, branches: 100, functions: 100 },
       },
     },
   },

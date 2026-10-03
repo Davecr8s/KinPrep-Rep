@@ -26,6 +26,7 @@ export async function createStudent(
       subjects: input.subjects,
       language: input.language,
       whatsapp_number: input.whatsapp,
+      whatsapp_opt_in_at: input.dailyMessages ? new Date().toISOString() : null,
     })
     .select("id")
     .single();

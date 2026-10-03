@@ -6,7 +6,12 @@ import { AccuracyChart } from "@/components/accuracy-chart";
 import { SessionList, Stat, WeakTopics, WeekDots } from "@/components/progress";
 import { ButtonLink, Card, Notice, styles } from "@/components/ui";
 import { requirePayer } from "@/lib/auth";
-import { answerHistory, getChild, pendingConsentRequest } from "@/lib/data/children";
+import {
+  answerHistory,
+  getChild,
+  openMissedDaysAlert,
+  pendingConsentRequest,
+} from "@/lib/data/children";
 import { streakThreshold } from "@/lib/data/settings";
 import { childAccess } from "@/lib/data/status";
 import { EXAM_LABELS } from "@/lib/labels";
@@ -52,6 +57,7 @@ export default async function ChildDashboard({
     isOwner ? pendingConsentRequest(id) : Promise.resolve(null),
     streakThreshold(),
   ]);
+  const missed = await openMissedDaysAlert(id, answers);
   const thisWeek = answers.filter((a) => weekStart(lagosDay(a.answeredAt)) === weekStart(today));
   const eightWeeks = weeklyAccuracy(answers, today);
   const recent = answers.filter((a) => lagosDay(a.answeredAt) >= eightWeeks[0]!.weekStart);
@@ -98,6 +104,14 @@ export default async function ChildDashboard({
           {child.first_name} can start once their parent or guardian agrees.{" "}
           <Link href={`/app/children/${id}/consent`} className={styles.link}>
             {pendingConsent ? "Send the link again" : "Ask them now"}
+          </Link>
+        </Notice>
+      )}
+      {missed && (
+        <Notice tone="warn">
+          {child.first_name} hasn&apos;t practised for {missed.days} days in a row.{" "}
+          <Link href="#encourage" className={styles.link}>
+            Send some encouragement
           </Link>
         </Notice>
       )}

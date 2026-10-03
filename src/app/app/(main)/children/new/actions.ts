@@ -15,6 +15,7 @@ const TEXT_FIELDS = [
   "birthYear",
   "exam",
   "examDate",
+  "dailyMessages",
   "language",
   "whatsapp",
   "isGuardian",

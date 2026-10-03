@@ -216,6 +216,20 @@ export function ChildFields({ state, lagosYear }: { state: ChildFormState; lagos
           <FieldError message={state.errors.whatsapp} />
         </label>
       )}
+      {senior && (
+        <label className="-mt-2 flex cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            name="dailyMessages"
+            defaultChecked={text("dailyMessages") === "on"}
+            className="mt-1 size-5 shrink-0 accent-navy"
+          />
+          <span>
+            Send them a short WhatsApp message each morning when their questions are ready. They can
+            reply STOP at any time.
+          </span>
+        </label>
+      )}
       {junior && (
         <div className="rounded-lg bg-navy/5 px-4 py-3">
           <p className="font-semibold">Junior mode (under 13)</p>

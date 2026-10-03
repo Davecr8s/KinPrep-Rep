@@ -27,6 +27,9 @@ npm run dev                  # http://localhost:3000
 | `npm test`                                 | Unit and database tests (Vitest; the database tests run in PGlite, no server needed)      |
 | `npm run test:coverage`                    | Tests with coverage; business rules must reach 100%                                       |
 | `npm run simulate:engine`                  | 30 simulated days of one student on the real schema: the day-by-day set mix and bank use  |
+| `npm run jobs -- <job> --dry-run`          | Runs a scheduled job on the running site (dry run: who would get what, nothing sent)      |
+| `npm run jobs:demo`                        | The scheduled jobs against the seed's people, offline: prints every run                   |
+| `npm run meta:templates`                   | Each template's approval status and category at Meta (flags ones moved to marketing)      |
 | `npm run test:e2e`                         | End-to-end tests (Playwright, mobile Chrome). First run `npx playwright install chromium` |
 | `npm run format`                           | Format all files with Prettier                                                            |
 | `npm run db:push`                          | Apply migrations to the database in `SUPABASE_DB_URL`                                     |
@@ -52,6 +55,9 @@ npm run dev                  # http://localhost:3000
 | `src/lib/rules/progress.ts`                         | Dots, streak, accuracy trend, weakest topics, weekly report and its WhatsApp text                      |
 | `src/proxy.ts`                                      | Refreshes the Supabase session and guards /app                                                         |
 | `src/lib/engine/`                                   | Practice engine shared by bot and web: daily set, mastery and spaced review, bank runway, session flow |
+| `src/lib/jobs/`                                     | Scheduled jobs, outbound queue (limits, retries, cost log), email, report rules                        |
+| `src/app/api/jobs/[job]/`                           | Vercel Cron endpoints for the jobs (Bearer CRON_SECRET)                                                |
+| `src/config/templates.ts`                           | Every WhatsApp template: name, language, category, body, variables, buttons                            |
 | `src/lib/practice/`                                 | Practice data access, signed links and the web page (`web.ts`, `web-html.ts`)                          |
 | `src/app/p/[token]/`                                | Web practice page (juniors, and seniors when WhatsApp is down): plain HTML, a few KB per load          |
 | `src/app/admin/practice-links/`                     | Admin: today's practice links for every active student, in one click                                   |

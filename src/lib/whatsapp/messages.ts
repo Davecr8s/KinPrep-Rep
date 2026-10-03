@@ -14,11 +14,24 @@ export const LIMITS = {
 export type Button = { id: string; title: string };
 export type Row = { id: string; title: string; description?: string };
 
+/** A value for one of a template's buttons, by position. */
+export type TemplateButtonValue =
+  | { index: number; type: "quick_reply"; payload: string }
+  /** The dynamic end of a link button's URL. */
+  | { index: number; type: "url"; text: string };
+
 export type Outbound =
   | { kind: "text"; text: string }
   | { kind: "buttons"; text: string; buttons: Button[] }
   | { kind: "list"; text: string; button: string; rows: Row[] }
-  | { kind: "template"; name: string; language: string };
+  | {
+      kind: "template";
+      name: string;
+      language: string;
+      /** Values for the body's {{1}}, {{2}}, ... */
+      body?: string[];
+      buttons?: TemplateButtonValue[];
+    };
 
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
@@ -29,7 +42,13 @@ export function assertValid(message: Outbound): void {
   const fail = (why: string) => {
     throw new Error(`Invalid WhatsApp message: ${why}`);
   };
-  if (message.kind === "template") return;
+  if (message.kind === "template") {
+    // Meta rejects template values with new lines, tabs or more than four spaces in a row.
+    for (const v of message.body ?? []) {
+      if (!v.trim() || /[\n\t]| {5}/.test(v)) fail(`template value "${v}" not allowed`);
+    }
+    return;
+  }
   if (!message.text.trim()) fail("empty body");
   if (message.text.length > (message.kind === "text" ? 4096 : LIMITS.body)) fail("body too long");
   if (message.kind === "buttons") {
@@ -88,7 +107,30 @@ export function toCloudPayload(to: string, message: Outbound): Record<string, un
       return {
         ...base,
         type: "template",
-        template: { name: message.name, language: { code: message.language } },
+        template: {
+          name: message.name,
+          language: { code: message.language },
+          components: [
+            ...(message.body?.length
+              ? [
+                  {
+                    type: "body",
+                    parameters: message.body.map((text) => ({ type: "text", text })),
+                  },
+                ]
+              : []),
+            ...(message.buttons ?? []).map((b) => ({
+              type: "button",
+              sub_type: b.type,
+              index: String(b.index),
+              parameters: [
+                b.type === "quick_reply"
+                  ? { type: "payload", payload: b.payload }
+                  : { type: "text", text: b.text },
+              ],
+            })),
+          ],
+        },
       };
   }
 }

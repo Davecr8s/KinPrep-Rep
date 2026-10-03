@@ -50,6 +50,8 @@ export const COPY = {
     "You've stopped all KinPrep messages. We won't message you again.\n\nChanged your mind? Send START any time.",
   optedOut: "You've stopped KinPrep messages. Send START to begin again.",
   welcomeBack: "Welcome back to KinPrep! 👋",
+  morningOptIn:
+    "I'll send you a short message each morning when your questions are ready. Send STOP any time to stop.",
   awaitingConsent:
     "Hi! Your KinPrep sign-up isn't finished yet: your parent or guardian needs to agree first. Ask them to check the link they were sent, then send START here.",
   noQuestions: "There are no questions ready for your subjects yet. Please try again later today.",
@@ -282,9 +284,15 @@ async function startOrResume(ctx: Ctx): Promise<void> {
     return;
   }
   if (set.kind === "started") {
+    // Sending START is the student's own opt-in to the morning message (and reminder).
+    const [optedIn] = await sql.query(
+      "update public.students set whatsapp_opt_in_at = $2 where id = $1 and whatsapp_opt_in_at is null returning id",
+      [student.id, now],
+    );
     await ctx.send(
       text(
-        `Hi ${student.first_name}! Today's set has ${set.session.question_ids.length} questions. Let's go 💪`,
+        `Hi ${student.first_name}! Today's set has ${set.session.question_ids.length} questions. Let's go 💪` +
+          (optedIn ? `\n\n${COPY.morningOptIn}` : ""),
       ),
     );
   }

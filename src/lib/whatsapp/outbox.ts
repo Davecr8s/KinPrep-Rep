@@ -53,9 +53,13 @@ export type SendResult = "sent" | "simulated" | "blocked" | "failed";
 
 export type SendOptions = {
   studentId?: string | null;
-  /** True for messages KinPrep starts (morning nudge). Replies to the contact are false. */
+  /** True for messages KinPrep starts (morning message, reports). Replies to the contact are false. */
   businessInitiated?: boolean;
+  /** Logged with the send: which template, its category, the estimated cost, the queue row. */
+  meta?: { template?: string; category?: string; costUsd?: number; queueId?: number };
 };
+
+export type Delivery = { status: SendResult; waId?: string; error?: string };
 
 /**
  * The only way the bot sends anything. Enforces the WhatsApp rules (CLAUDE.md): STOP blocks every
@@ -69,11 +73,13 @@ export function createOutbox(deps: { sql: Sql; transport: Transport; now?: () =>
     phone: string,
     message: Outbound,
     status: SendResult,
-    extra: { studentId?: string | null; waId?: string; error?: string },
+    extra: { studentId?: string | null; waId?: string; error?: string; meta?: SendOptions["meta"] },
   ) {
     await deps.sql.query(
-      `insert into public.message_log (direction, phone, student_id, wa_message_id, kind, body, status, error, simulated)
-       values ('out', $1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
+      `insert into public.message_log
+         (direction, phone, student_id, wa_message_id, kind, body, status, error, simulated,
+          template, category, estimated_cost_usd, queue_id)
+       values ('out', $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12)`,
       [
         phone,
         extra.studentId ?? null,
@@ -83,38 +89,52 @@ export function createOutbox(deps: { sql: Sql; transport: Transport; now?: () =>
         status,
         extra.error ?? null,
         deps.transport.simulated,
+        extra.meta?.template ?? null,
+        extra.meta?.category ?? null,
+        extra.meta?.costUsd ?? null,
+        extra.meta?.queueId ?? null,
       ],
     );
   }
 
+  async function deliver(
+    phone: string,
+    message: Outbound,
+    options: SendOptions = {},
+  ): Promise<Delivery> {
+    assertValid(message);
+    const [contact] = await deps.sql.query<{
+      last_inbound_at: Date | null;
+      opted_out_at: Date | null;
+    }>("select last_inbound_at, opted_out_at from public.wa_contacts where phone = $1", [phone]);
+    let blocked: string | null = null;
+    if (options.businessInitiated && contact?.opted_out_at) blocked = "contact sent STOP";
+    else if (
+      message.kind !== "template" &&
+      !canSendFreeform({ lastInboundAt: contact?.last_inbound_at ?? null }, now())
+    ) {
+      blocked = "outside the 24-hour window; only templates allowed";
+    }
+    const extra = { studentId: options.studentId, meta: options.meta };
+    if (blocked) {
+      await log(phone, message, "blocked", { ...extra, error: blocked });
+      return { status: "blocked", error: blocked };
+    }
+    try {
+      const waId = await deps.transport.send(phone, message);
+      const status = deps.transport.simulated ? "simulated" : "sent";
+      await log(phone, message, status, { ...extra, waId });
+      return { status, waId };
+    } catch (error) {
+      await log(phone, message, "failed", { ...extra, error: String(error) });
+      return { status: "failed", error: String(error) };
+    }
+  }
+
   return {
+    deliver,
     async send(phone: string, message: Outbound, options: SendOptions = {}): Promise<SendResult> {
-      assertValid(message);
-      const [contact] = await deps.sql.query<{
-        last_inbound_at: Date | null;
-        opted_out_at: Date | null;
-      }>("select last_inbound_at, opted_out_at from public.wa_contacts where phone = $1", [phone]);
-      let blocked: string | null = null;
-      if (options.businessInitiated && contact?.opted_out_at) blocked = "contact sent STOP";
-      else if (
-        message.kind !== "template" &&
-        !canSendFreeform({ lastInboundAt: contact?.last_inbound_at ?? null }, now())
-      ) {
-        blocked = "outside the 24-hour window; only templates allowed";
-      }
-      if (blocked) {
-        await log(phone, message, "blocked", { studentId: options.studentId, error: blocked });
-        return "blocked";
-      }
-      try {
-        const waId = await deps.transport.send(phone, message);
-        const status = deps.transport.simulated ? "simulated" : "sent";
-        await log(phone, message, status, { studentId: options.studentId, waId });
-        return status;
-      } catch (error) {
-        await log(phone, message, "failed", { studentId: options.studentId, error: String(error) });
-        return "failed";
-      }
+      return (await deliver(phone, message, options)).status;
     },
   };
 }

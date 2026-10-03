@@ -5,7 +5,6 @@ import { startFreeTrial } from "@/lib/payments/trial";
 import { COPY } from "@/lib/whatsapp/bot";
 import { enqueueInbound, processJobs } from "@/lib/whatsapp/jobs";
 import type { Outbound } from "@/lib/whatsapp/messages";
-import { sendMorningNudges } from "@/lib/whatsapp/morning";
 import { createOutbox, simulatedTransport } from "@/lib/whatsapp/outbox";
 import { conversation, simulateInbound } from "@/lib/whatsapp/simulator";
 import { createStudent, createTestDb, createUser, SENIOR_BIRTH_YEAR } from "./db/harness";
@@ -313,30 +312,6 @@ describe("webhook jobs and the 24-hour window", () => {
       [LAPSED],
     );
     expect(rows[0]!.error).toMatch(/24-hour/);
-  });
-});
-
-describe("morning nudge", () => {
-  it("sends one template per household with an active student, skipping STOP and inactive numbers", async () => {
-    await db.query("update public.wa_contacts set opted_out_at = now() where phone = $1", [SOLO]);
-    const before = await db.query<{ id: number }>(
-      "select coalesce(max(id), 0)::int as id from public.message_log",
-    );
-    const outbox = createOutbox({ sql, transport: simulatedTransport(), now });
-    const result = await sendMorningNudges(
-      sql,
-      outbox,
-      { name: "kinprep_morning", language: "en" },
-      now(),
-    );
-    // HOUSE (Ada and Chidi): one template. SOLO: opted out. LAPSED: inactive. NO_CONSENT: no consent.
-    expect(result.sent).toBe(1);
-    const { rows } = await db.query<{ phone: string }>(
-      "select phone from public.message_log where kind = 'template' and status <> 'blocked' and id > $1",
-      [before.rows[0]!.id],
-    );
-    expect(rows.map((r) => r.phone)).toEqual([HOUSE]);
-    await db.query("update public.wa_contacts set opted_out_at = null where phone = $1", [SOLO]);
   });
 });
 

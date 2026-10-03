@@ -3,6 +3,7 @@
 export const E2E_DB_PORT = 54329;
 export const E2E_DB_URL = `postgres://postgres:postgres@127.0.0.1:${E2E_DB_PORT}/postgres`;
 export const E2E_PRACTICE_SECRET = "e2e-practice-link-secret-not-for-production";
+export const E2E_CRON_SECRET = "e2e-cron-secret-not-for-production-0123456789";
 
 export const E2E_STUDENTS = {
   junior: {

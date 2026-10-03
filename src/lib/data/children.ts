@@ -102,6 +102,32 @@ export async function pendingConsentRequest(studentId: string) {
   return data ? PendingConsentSchema.parse(data) : null;
 }
 
+const MissedDaysSchema = z.object({ since_day: z.string(), days: z.number() });
+
+/**
+ * The latest "missed 2 days in a row" alert (written by the 21:00 job), if the child hasn't
+ * practised since it started.
+ */
+export async function openMissedDaysAlert(
+  studentId: string,
+  answers: readonly AnswerRow[],
+): Promise<{ sinceDay: string; days: number } | null> {
+  const db = await userDb();
+  const { data, error } = await db
+    .from("student_alerts")
+    .select("since_day, days")
+    .eq("student_id", studentId)
+    .eq("kind", "missed_days")
+    .order("since_day", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Loading alerts failed: ${error.message}`);
+  if (!data) return null;
+  const alert = MissedDaysSchema.parse(data);
+  const practisedSince = answers.some((a) => lagosDay(a.answeredAt) >= alert.since_day);
+  return practisedSince ? null : { sinceDay: alert.since_day, days: alert.days };
+}
+
 const SubscriptionSummarySchema = z.object({
   id: z.string(),
   provider: z.enum(["stripe", "paystack", "manual", "trial"]),

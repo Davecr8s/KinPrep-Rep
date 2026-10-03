@@ -1,5 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_DB_PORT, E2E_DB_URL, E2E_PRACTICE_SECRET } from "./e2e/support/fixtures";
+import {
+  E2E_CRON_SECRET,
+  E2E_DB_PORT,
+  E2E_DB_URL,
+  E2E_PRACTICE_SECRET,
+} from "./e2e/support/fixtures";
 
 const port = 3000;
 
@@ -34,6 +39,7 @@ export default defineConfig({
         SUPABASE_DB_URL: E2E_DB_URL,
         SUPABASE_DB_POOL_MAX: "1",
         PRACTICE_LINK_SECRET: E2E_PRACTICE_SECRET,
+        CRON_SECRET: E2E_CRON_SECRET,
         NEXT_PUBLIC_APP_URL: `http://localhost:${port}`,
       },
     },

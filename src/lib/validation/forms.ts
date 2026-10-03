@@ -4,6 +4,7 @@ import { CLASSES, EXAMS } from "@/lib/labels";
 import { normalizePhone } from "@/lib/phone";
 import { lagosYear } from "@/lib/rules/days";
 import { isSeniorBirthYear, subjectsProblem } from "@/lib/rules/students";
+import { isReportTime } from "@/lib/jobs/rules";
 
 // Zod schemas for every payer-app form (CLAUDE.md: validate every input). They take FormData
 // values (strings, "on" for ticked boxes) and enforce the business rules.
@@ -98,6 +99,8 @@ export function childSchema(now: Date) {
       subjects: z.array(z.enum(SUBJECTS)).default([]),
       language: z.enum(["en", "pcm"]).default("en"),
       whatsapp: optionalText,
+      /** The parent opts the senior in to a WhatsApp message each morning (and the reminder). */
+      dailyMessages: ticked,
     })
     .superRefine((v, ctx) => {
       const problem = subjectsProblem(v.exam, v.subjects);
@@ -147,7 +150,13 @@ export function childSchema(now: Date) {
           return z.NEVER;
         }
       }
-      return { ...v, examDate: v.examDate ?? null, whatsapp, senior };
+      return {
+        ...v,
+        examDate: v.examDate ?? null,
+        whatsapp,
+        senior,
+        dailyMessages: whatsapp !== null && v.dailyMessages,
+      };
     });
 }
 
@@ -182,6 +191,14 @@ export const ReportSettingsSchema = z
     country: z.enum(["NG", "GB", "US", "CA"]).default("GB"),
   })
   .transform((v, ctx) => {
+    if (!isReportTime(v.reportWeekday, v.reportHour)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["reportTime"],
+        message: "Choose a time between Saturday evening and Sunday night.",
+      });
+      return z.NEVER;
+    }
     const whatsapp = v.whatsapp ? normalizePhone(v.whatsapp, v.country) : null;
     if (v.whatsapp && !whatsapp) {
       ctx.addIssue({

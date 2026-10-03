@@ -42,8 +42,14 @@ export const envGroups = {
       .string()
       .regex(/^v\d+\.\d+$/)
       .default("v23.0"),
-    // Approved template with a "Start" quick-reply button, for the morning nudge.
-    WHATSAPP_TEMPLATE_MORNING: z.string().min(1).optional(),
+    // WhatsApp Business Account id: only for scripts/meta-templates.ts (template status).
+    WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().min(1).optional(),
+  }),
+  // Email for payers not on WhatsApp (weekly report, junior links, alerts), via Resend.
+  email: z.object({
+    RESEND_API_KEY: z.string().startsWith("re_"),
+    // e.g. "KinPrep <reports@kinprep.ng>"; the domain must be verified in Resend.
+    EMAIL_FROM: z.string().min(3),
   }),
   // Signs the web practice links (/p/<token>). Changing it invalidates every link issued.
   practice: z.object({
