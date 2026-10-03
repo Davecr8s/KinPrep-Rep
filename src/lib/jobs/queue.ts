@@ -98,6 +98,8 @@ export type WorkerDeps = {
   sleep?: (ms: number) => Promise<void>;
   /** Stop claiming new messages after this long (default 4 minutes). */
   budgetMs?: number;
+  /** Milliseconds for pacing and the time budget (default Date.now); tests pass a fake one. */
+  clock?: () => number;
 };
 
 export type WorkerResult = {
@@ -126,7 +128,8 @@ export async function runQueue(deps: WorkerDeps): Promise<WorkerResult> {
   const { sql } = deps;
   const now = deps.now ?? (() => new Date());
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
-  const started = Date.now();
+  const clock = deps.clock ?? Date.now;
+  const started = clock();
   const budget = deps.budgetMs ?? 240_000;
   const limits = await sendingLimits(sql);
   const result: WorkerResult = {
@@ -138,7 +141,7 @@ export async function runQueue(deps: WorkerDeps): Promise<WorkerResult> {
     waiting: 0,
   };
   const outbox = deps.whatsapp ? createOutbox({ sql, transport: deps.whatsapp, now }) : null;
-  let lastWhatsAppSend = 0;
+  let lastWhatsAppSend = -Infinity;
 
   const finish = async (id: number, fields: Record<string, unknown>) => {
     const keys = Object.keys(fields);
@@ -162,7 +165,7 @@ export async function runQueue(deps: WorkerDeps): Promise<WorkerResult> {
     }
   };
 
-  while (Date.now() - started < budget) {
+  while (clock() - started < budget) {
     const at = now();
     const [{ n: sentToday }] = (await sql.query<{ n: number }>(
       `select count(*)::int as n from public.outbound_queue
@@ -201,9 +204,9 @@ export async function runQueue(deps: WorkerDeps): Promise<WorkerResult> {
 
     if (item.channel === "whatsapp") {
       // Pace sends to the per-second limit.
-      const gap = 1000 / limits.perSecond - (Date.now() - lastWhatsAppSend);
+      const gap = 1000 / limits.perSecond - (clock() - lastWhatsAppSend);
       if (gap > 0) await sleep(gap);
-      lastWhatsAppSend = Date.now();
+      lastWhatsAppSend = clock();
       const [contact] = await sql.query<{ last_inbound_at: Date | null }>(
         "select last_inbound_at from public.wa_contacts where phone = $1",
         [item.recipient],

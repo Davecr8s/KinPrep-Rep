@@ -23,10 +23,11 @@ async function approvedQuestion(status: "approved" | "draft" = "approved"): Prom
     [`Topic ${randomUUID().slice(0, 8)}`],
   );
   const { rows } = await db.query<{ id: string }>(
-    `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at)
+    `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at, original_confirmed)
      values ('physics', $1, 'What is the SI unit of force?', '["Newton","Joule","Watt","Pascal"]', 0, 'Force is measured in newtons.',
              $2::text::public.question_status,
-             case when $2::text = 'approved' then $3::uuid end, case when $2::text = 'approved' then now() end)
+             case when $2::text = 'approved' then $3::uuid end, case when $2::text = 'approved' then now() end,
+             true)
      returning id`,
     [topic[0]!.id, status, reviewer],
   );

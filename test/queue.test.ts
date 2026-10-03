@@ -62,6 +62,8 @@ describe("sending limits", () => {
       "insert into public.settings (key, value) values ('wa_messages_per_second', '4')",
     );
     for (let n = 1; n <= 3; n++) await enqueue(sql, item(n), { dryRun: false, now: now() });
+    // A fake clock that only moves when the worker sleeps: sends are instant.
+    let ms = 0;
     const waits: number[] = [];
     const transport = countingTransport();
     await runQueue({
@@ -69,13 +71,15 @@ describe("sending limits", () => {
       whatsapp: transport,
       email: null,
       now,
-      sleep: async (ms) => void waits.push(ms),
+      clock: () => ms,
+      sleep: async (wait) => {
+        waits.push(wait);
+        ms += wait;
+      },
     });
     expect(transport.sent).toHaveLength(3);
-    // 4 a second = 250 ms apart (the first send waits for nothing before it).
-    expect(waits.length).toBeGreaterThanOrEqual(2);
-    for (const w of waits) expect(w).toBeLessThanOrEqual(250);
-    expect(Math.max(...waits)).toBeGreaterThan(200);
+    // 4 a second = 250 ms apart; the first send waits for nothing.
+    expect(waits).toEqual([250, 250]);
   });
 
   it("stops at the daily limit and leaves the rest waiting", async () => {

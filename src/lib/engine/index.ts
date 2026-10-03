@@ -20,7 +20,8 @@ const toDay = (value: Date | string | null): Day | null =>
   value === null ? null : lagosDay(new Date(value));
 
 /**
- * The student's set for `day`: N approved questions (N = the questions-per-day setting) in their
+ * The student's set for `day`: N approved questions (N = the questions-per-day setting; never a
+ * draft, a rejected question or one flagged for re-checking) in their
  * subjects and class, mixed as described in select.ts. If the bank can't fill it, the set is
  * topped up with review questions and a bank_shortage event is logged per empty topic.
  */
@@ -51,7 +52,7 @@ export async function buildDailySet(
      from public.questions q
      left join public.answers a on a.question_id = q.id and a.student_id = $1
      left join public.question_reviews r on r.question_id = q.id and r.student_id = $1
-     where q.status = 'approved'
+     where q.status = 'approved' and q.flagged_at is null
        and q.subject::text = any($2::text[])
        and $3::public.student_class = any(q.classes)
      group by q.id, r.next_review_at`,
@@ -175,7 +176,8 @@ export async function bankRunway(
   const students = await sql.query<{ id: string; fresh: number; subjects: number }>(
     `select s.id::text, cardinality(s.subjects) as subjects,
             (select count(*)::int from public.questions q
-             where q.status = 'approved' and q.subject = $1::public.subject and s.class = any(q.classes)
+             where q.status = 'approved' and q.flagged_at is null
+               and q.subject = $1::public.subject and s.class = any(q.classes)
                and not exists (select 1 from public.answers a where a.student_id = s.id and a.question_id = q.id)
             ) as fresh
      from public.students s
@@ -186,7 +188,7 @@ export async function bankRunway(
   const active = [];
   for (const s of students) if (await isStudentActive(s.id, { now, store })) active.push(s);
   const [bank] = await sql.query<{ n: number }>(
-    "select count(*)::int as n from public.questions where status = 'approved' and subject = $1::public.subject",
+    "select count(*)::int as n from public.questions where status = 'approved' and flagged_at is null and subject = $1::public.subject",
     [subject],
   );
   return runwayDays({

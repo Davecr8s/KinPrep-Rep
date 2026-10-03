@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "test/**/*.test.ts"],
     // Each database test file boots its own in-process Postgres (PGlite).
     testTimeout: 20_000,
     hookTimeout: 60_000,
@@ -24,6 +24,7 @@ export default defineConfig({
         "src/lib/engine/mastery.ts",
         "src/lib/engine/runway.ts",
         "src/lib/jobs/rules.ts",
+        "src/lib/bank/rules.ts",
       ],
       exclude: ["**/*.test.ts"],
       // Business rules and the engine's decisions must be fully tested (CLAUDE.md, Phase 2).
@@ -31,6 +32,7 @@ export default defineConfig({
         "src/lib/rules/**": { lines: 100, branches: 100, functions: 100 },
         "src/lib/engine/{select,mastery,runway}.ts": { lines: 100, branches: 100, functions: 100 },
         "src/lib/jobs/rules.ts": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/bank/rules.ts": { lines: 100, branches: 100, functions: 100 },
       },
     },
   },

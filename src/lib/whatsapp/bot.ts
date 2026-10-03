@@ -19,16 +19,18 @@ import {
   takeEncouragements,
   todaySession,
   type PracticeStudent,
-  type Question,
   type Session,
 } from "@/lib/practice/repo";
 import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
 import { currentStreak, streakThreshold, weekDots } from "@/lib/engine";
 import { parseReply, parseText, replyIds, type Intent } from "./commands";
+import { answerFeedback, LETTERS, nextButton, questionMessages } from "./question-format";
 import { LIMITS, truncate, type Outbound } from "./messages";
 import type { Outbox } from "./outbox";
 import { logInbound, setActiveStudent, setOptedOut, studentsForPhone, touchContact } from "./repo";
 import type { InboundMessage } from "./webhook";
+
+export { questionMessages } from "./question-format";
 
 // The senior-student WhatsApp bot. Students start each day themselves (START or the morning
 // template's Start button), which opens the free 24-hour window; everything after that is a reply.
@@ -42,7 +44,6 @@ export type BotDeps = {
   simulated?: boolean;
 };
 
-const LETTERS = ["A", "B", "C", "D", "E"];
 const text = (t: string): Outbound => ({ kind: "text", text: t });
 
 export const COPY = {
@@ -85,43 +86,6 @@ function intentOf(message: InboundMessage): Intent {
   if (message.kind === "text") return parseText(message.text ?? "");
   if (message.kind === "reply") return parseReply(message.replyId ?? "");
   return { type: "unknown" };
-}
-
-/** One question as a WhatsApp message: reply buttons if the options fit, otherwise a list. */
-export function questionMessages(q: Question, session: Session, position: number): Outbound[] {
-  const total = session.question_ids.length;
-  const options = q.options.map((o, i) => `${LETTERS[i]}) ${o}`);
-  const header = `Question ${position + 1} of ${total} · ${SUBJECT_LABELS[q.subject]}`;
-  const full = `${header}\n\n${q.stem}\n\n${options.join("\n")}`;
-  const out: Outbound[] = [];
-  let body = full;
-  if (full.length > LIMITS.body) {
-    out.push(text(full));
-    body = `${header}\n\nChoose your answer.`;
-  }
-  const fitsButtons =
-    options.length <= LIMITS.buttons && options.every((o) => o.length <= LIMITS.buttonTitle);
-  if (fitsButtons) {
-    out.push({
-      kind: "buttons",
-      text: body,
-      buttons: options.map((o, i) => ({ id: replyIds.answer(session.id, position, i), title: o })),
-    });
-  } else {
-    out.push({
-      kind: "list",
-      text: body,
-      button: "Choose answer",
-      rows: q.options.map((o, i) => ({
-        id: replyIds.answer(session.id, position, i),
-        title: truncate(`${LETTERS[i]}) ${o}`, LIMITS.rowTitle),
-        ...(o.length > LIMITS.rowTitle - 3
-          ? { description: truncate(o, LIMITS.rowDescription) }
-          : {}),
-      })),
-    });
-  }
-  return out;
 }
 
 export async function handleInbound(message: InboundMessage, deps: BotDeps): Promise<void> {
@@ -330,14 +294,6 @@ async function sendQuestion(ctx: Ctx, session: Session, position: number): Promi
   for (const m of questionMessages(q, session, position)) await ctx.send(m);
 }
 
-function nextButton(session: Session) {
-  const last = session.position >= session.question_ids.length - 1;
-  return {
-    id: replyIds.next(session.id, session.position),
-    title: last ? "See my score ▶" : "Next question ▶",
-  };
-}
-
 async function answer(ctx: Ctx, session: Session, position: number, option: number): Promise<void> {
   const marked = await markAnswer(ctx.sql, {
     session,
@@ -354,17 +310,14 @@ async function answer(ctx: Ctx, session: Session, position: number, option: numb
     await ctx.send(text(`Please choose ${LETTERS.slice(0, q.options.length).join(", ")}.`));
     return;
   }
-  const verdict = marked.correct
-    ? "✅ Correct!"
-    : `❌ Not quite. The answer is ${LETTERS[q.answer_index]}) ${q.options[q.answer_index]}.`;
-  await ctx.send({
-    kind: "buttons",
-    text: truncate(`${verdict}\n\n${explanationFor(q, ctx.student.language)}`, LIMITS.body),
-    buttons: [
-      nextButton({ ...session, position }),
-      { id: replyIds.explainAgain(session.id, position), title: "Explain another way" },
-    ],
-  });
+  await ctx.send(
+    answerFeedback(
+      q,
+      { ...session, position },
+      marked.correct,
+      explanationFor(q, ctx.student.language),
+    ),
+  );
 }
 
 async function explainAgain(ctx: Ctx, session: Session, position: number): Promise<void> {

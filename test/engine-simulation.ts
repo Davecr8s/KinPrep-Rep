@@ -108,8 +108,8 @@ export async function simulate(): Promise<SimResult> {
       for (let q = 0; q < per + (subject === "english" && t === 0 ? 10 : 0); q++) {
         const juniorOnly = q >= per;
         await db.query(
-          `insert into public.questions (id, subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at, classes)
-           values ($6, $1, $2, $3, '["right","wrong 1","wrong 2","wrong 3"]', 0, 'Because.', 'approved', $4, now(), $5)`,
+          `insert into public.questions (id, subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at, original_confirmed, classes)
+           values ($6, $1, $2, $3, '["right","wrong 1","wrong 2","wrong 3"]', 0, 'Because.', 'approved', $4, now(), true, $5)`,
           [
             subject,
             topicId,

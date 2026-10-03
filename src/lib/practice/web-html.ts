@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { SUBJECT_LABELS } from "@/lib/labels";
 import type { WeekDot } from "@/lib/rules/progress";
 import type { League, SetSummary } from "@/lib/engine/session";
@@ -8,7 +7,8 @@ import type { Question } from "./repo";
 // a few KB on slow data with no framework to download. Every action is a plain form POST, so it
 // works without JavaScript; the script only makes taps instant and, if the connection drops,
 // keeps the tap on the phone and resends it when the phone is back online. The server ignores
-// repeats, so resending is always safe.
+// repeats, so resending is always safe. Pure (no Node APIs), so the question editor's preview
+// renders exactly this HTML in the browser; the security policy is in web-csp.ts.
 
 const LETTERS = ["A", "B", "C", "D", "E"];
 
@@ -29,7 +29,7 @@ function paragraphs(text: string): string {
     .join("");
 }
 
-const CSS = `
+export const CSS = `
 :root{--navy:#25308A;--navy-dark:#1b2468;--orange:#F0A93C;--orange-light:#fbe7c4;--ink:#161a33;--muted:#575d78;--line:#dcdfec;--bg:#f4f5fa;--ok:#17703f;--ok-bg:#e2f3e9;--bad:#b42318;--bad-bg:#fdeceb}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -82,27 +82,13 @@ ol.league .me{font-weight:700;color:var(--navy)}
 a{color:var(--navy)}
 `.replace(/\n/g, "");
 
-const SCRIPT = `(function(){var K="kp:"+location.pathname,busy=0,R=document.documentElement;
+export const SCRIPT = `(function(){var K="kp:"+location.pathname,busy=0,R=document.documentElement;
 function get(){try{return JSON.parse(localStorage.getItem(K)||"null")}catch(e){return null}}
 function put(v){try{v?localStorage.setItem(K,JSON.stringify(v)):localStorage.removeItem(K)}catch(e){}}
 function send(d){if(busy)return;busy=1;R.classList.add("busy");R.classList.remove("offline");
 fetch(location.pathname,{method:"POST",body:new URLSearchParams(d),credentials:"omit"}).then(function(r){if(r.status>=500)throw 0;return r.text()}).then(function(h){put(null);var n=new DOMParser().parseFromString(h,"text/html");document.title=n.title;document.body.replaceWith(n.body);scrollTo(0,0)},function(){put(d);R.classList.add("offline")}).then(function(){busy=0;R.classList.remove("busy")})}
 document.addEventListener("submit",function(e){if(!window.fetch||!window.URLSearchParams||!window.DOMParser)return;e.preventDefault();var f=e.target,d={},i,b=f.querySelector("button");for(i=0;i<f.elements.length;i++)if(f.elements[i].name)d[f.elements[i].name]=f.elements[i].value;if(b)b.classList.add("picked");send(d)});
 function retry(){var d=get();if(d)send(d)}addEventListener("online",retry);addEventListener("pageshow",retry)})();`;
-
-const hash = (s: string) => `'sha256-${createHash("sha256").update(s).digest("base64")}'`;
-
-/** Only our own inline style and script may run; nothing loads from anywhere else. */
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'none'",
-  `style-src ${hash(CSS)}`,
-  `script-src ${hash(SCRIPT)}`,
-  "connect-src 'self'",
-  "form-action 'self'",
-  "img-src data:",
-  "base-uri 'none'",
-  "frame-ancestors 'none'",
-].join("; ");
 
 const OFFLINE_NOTE =
   '<p class="note" role="status">No connection right now. Your answer is kept on this phone and will be sent as soon as you are back online.</p>';

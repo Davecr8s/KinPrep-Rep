@@ -55,6 +55,8 @@ npm run dev                  # http://localhost:3000
 | `src/lib/rules/progress.ts`                         | Dots, streak, accuracy trend, weakest topics, weekly report and its WhatsApp text                      |
 | `src/proxy.ts`                                      | Refreshes the Supabase session and guards /app                                                         |
 | `src/lib/engine/`                                   | Practice engine shared by bot and web: daily set, mastery and spaced review, bank runway, session flow |
+| `src/lib/bank/`                                     | Question bank: syllabus, editor saves, review decisions, AI drafts (LLM), CSV, bank health             |
+| `src/app/admin/questions/`                          | Question bank pages for admins and reviewers, with the live WhatsApp/web preview                       |
 | `src/lib/jobs/`                                     | Scheduled jobs, outbound queue (limits, retries, cost log), email, report rules                        |
 | `src/app/api/jobs/[job]/`                           | Vercel Cron endpoints for the jobs (Bearer CRON_SECRET)                                                |
 | `src/config/templates.ts`                           | Every WhatsApp template: name, language, category, body, variables, buttons                            |

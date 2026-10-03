@@ -24,8 +24,8 @@ import {
   todaySession,
   type PracticeStudent,
 } from "./repo";
+import { CONTENT_SECURITY_POLICY } from "./web-csp";
 import {
-  CONTENT_SECURITY_POLICY,
   feedbackScreen,
   messagePage,
   questionScreen,

@@ -57,8 +57,8 @@ export async function seedDemoPeople(db: PGlite, now: Date): Promise<DemoIds> {
     );
     for (let i = 0; i < 5; i++) {
       const { rows: q } = await db.query<{ id: string }>(
-        `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at)
-         values ($1, $2, $3, '["right","wrong"]', 0, 'Because.', 'approved', $4, now()) returning id::text`,
+        `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, status, approved_by, approved_at, original_confirmed)
+         values ($1, $2, $3, '["right","wrong"]', 0, 'Because.', 'approved', $4, now(), true) returning id::text`,
         [subject, t[0]!.id, `${topic} question ${i + 1}`, reviewer[0]!.id],
       );
       questionIds.push(q[0]!.id);

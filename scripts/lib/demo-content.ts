@@ -62,6 +62,7 @@ export async function ensureDemoQuestions(
               status: "approved",
               approved_by: reviewerId,
               approved_at: new Date().toISOString(),
+              original_confirmed: true,
               created_by: reviewerId,
             })),
           )

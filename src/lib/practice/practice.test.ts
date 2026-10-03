@@ -1,7 +1,8 @@
 import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { LINK_TTL_MS, practiceUrl, signPracticeLink, verifyPracticeLink } from "./links";
-import { CONTENT_SECURITY_POLICY, esc, page } from "./web-html";
+import { CONTENT_SECURITY_POLICY } from "./web-csp";
+import { esc, page } from "./web-html";
 
 const SECRET = "unit-test-practice-secret-0123456789";
 const STUDENT = "0b9a8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d";

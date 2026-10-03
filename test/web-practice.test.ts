@@ -53,8 +53,8 @@ beforeAll(async () => {
     );
     for (let i = 0; i < 4; i++) {
       await db.query(
-        `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, explanation_pcm, status, approved_by, approved_at)
-         values ($1, $2, $3, $4::jsonb, 0, $5, $6, 'approved', $7, now())`,
+        `insert into public.questions (subject, topic_id, stem, options, answer_index, explanation_en, explanation_pcm, status, approved_by, approved_at, original_confirmed)
+         values ($1, $2, $3, $4::jsonb, 0, $5, $6, 'approved', $7, now(), true)`,
         [
           subject,
           rows[0]!.id,
