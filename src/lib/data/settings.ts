@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { STREAK_DAY_THRESHOLD } from "@/config/pilot";
 import { adminDb } from "@/lib/db/admin";
 
 const BankDetailsSchema = z.object({
@@ -22,4 +23,16 @@ export async function manualBankDetails(): Promise<BankDetails | null> {
   if (error) throw new Error(`Loading settings failed: ${error.message}`);
   const parsed = BankDetailsSchema.safeParse(data?.value);
   return parsed.success ? parsed.data : null;
+}
+
+/** Answers that make a Lagos day count towards the streak (setting "streak_day_threshold"). */
+export async function streakThreshold(): Promise<number> {
+  const { data, error } = await adminDb()
+    .from("settings")
+    .select("value")
+    .eq("key", "streak_day_threshold")
+    .maybeSingle();
+  if (error) throw new Error(`Loading settings failed: ${error.message}`);
+  const n = Number(data?.value);
+  return Number.isInteger(n) && n >= 1 && n <= 20 ? n : STREAK_DAY_THRESHOLD;
 }

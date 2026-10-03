@@ -5,6 +5,7 @@ import { Stat, WeakTopics } from "@/components/progress";
 import { Card, styles } from "@/components/ui";
 import { requirePayer } from "@/lib/auth";
 import { answerHistory, getChild } from "@/lib/data/children";
+import { streakThreshold } from "@/lib/data/settings";
 import { SUBJECT_LABELS } from "@/lib/labels";
 import { addDays, lagosDay, weekStart } from "@/lib/rules/days";
 import { reportHeadline, reportText, weeklyReport } from "@/lib/rules/progress";
@@ -38,7 +39,7 @@ export default async function WeeklyReportPage({
   const monday = requested > thisWeek ? thisWeek : requested;
   // Reach back far enough for the streak as it stood on that Sunday.
   const answers = await answerHistory(id, now, addDays(monday, -120));
-  const report = weeklyReport(answers, monday);
+  const report = weeklyReport(answers, monday, await streakThreshold());
   const inProgress = monday === thisWeek;
 
   return (

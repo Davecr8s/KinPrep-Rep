@@ -26,6 +26,7 @@ npm run dev                  # http://localhost:3000
 | `npm run check`                            | Format check, lint, typecheck and all tests (run before pushing)                          |
 | `npm test`                                 | Unit and database tests (Vitest; the database tests run in PGlite, no server needed)      |
 | `npm run test:coverage`                    | Tests with coverage; business rules must reach 100%                                       |
+| `npm run simulate:engine`                  | 30 simulated days of one student on the real schema: the day-by-day set mix and bank use  |
 | `npm run test:e2e`                         | End-to-end tests (Playwright, mobile Chrome). First run `npx playwright install chromium` |
 | `npm run format`                           | Format all files with Prettier                                                            |
 | `npm run db:push`                          | Apply migrations to the database in `SUPABASE_DB_URL`                                     |
@@ -36,30 +37,31 @@ npm run dev                  # http://localhost:3000
 
 ## Layout
 
-| Path                                                | Contents                                                                                                 |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `src/config/`                                       | Prices, trial and grace periods, pilot settings, go/stop thresholds. The only place these values live.   |
-| `src/lib/env.ts`                                    | Server-only environment variables, validated with Zod, grouped by integration                            |
-| `src/lib/rules/`                                    | Pure business rules, fully tested. `access.ts`: when a subscription gives access                         |
-| `src/lib/access.ts`                                 | `isStudentActive(studentId)`: the single source of truth for access                                      |
-| `src/lib/payments/`                                 | `PaymentProvider` interface with Stripe, Paystack and Manual implementations; webhook handling           |
-| `src/app/api/webhooks/`                             | Stripe and Paystack webhook endpoints                                                                    |
-| `src/app/sponsor/[code]/`                           | "Get sponsored" page: starts Stripe Checkout for one student                                             |
-| `src/app/page.tsx`                                  | Landing page: tagline, prices by region, free trial, FAQ                                                 |
-| `src/app/app/`                                      | Payer app: sign-in, onboarding, children, plans, dashboard, weekly report, settings, groups              |
-| `src/app/consent/[token]/`, `src/app/join/[token]/` | Public pages: guardian consent, joining a group by invite link                                           |
-| `src/lib/rules/progress.ts`                         | Dots, streak, accuracy trend, weakest topics, weekly report and its WhatsApp text                        |
-| `src/proxy.ts`                                      | Refreshes the Supabase session and guards /app                                                           |
-| `src/lib/practice/`                                 | Daily practice shared by every channel: set engine, signed links, the web page (`web.ts`, `web-html.ts`) |
-| `src/app/p/[token]/`                                | Web practice page (juniors, and seniors when WhatsApp is down): plain HTML, a few KB per load            |
-| `src/app/admin/practice-links/`                     | Admin: today's practice links for every active student, in one click                                     |
-| `src/lib/whatsapp/`                                 | WhatsApp bot: webhook parsing, job table, bot logic, outbox (24-hour window, STOP), simulator            |
-| `src/app/api/whatsapp/`                             | Meta webhook (verification and inbound messages)                                                         |
-| `src/app/admin/dev/whatsapp/`                       | WhatsApp simulator for admins                                                                            |
-| `supabase/migrations/`                              | Database schema, RLS policies and billing functions                                                      |
-| `test/`                                             | Database and end-to-end payment tests (PGlite), shared test helpers                                      |
-| `scripts/`                                          | Database push, dev seed, Paystack plan setup                                                             |
-| `e2e/`                                              | Playwright tests; `e2e/support/db-server.ts` serves an in-memory Postgres (PGlite) for them              |
+| Path                                                | Contents                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `src/config/`                                       | Prices, trial and grace periods, pilot settings, go/stop thresholds. The only place these values live. |
+| `src/lib/env.ts`                                    | Server-only environment variables, validated with Zod, grouped by integration                          |
+| `src/lib/rules/`                                    | Pure business rules, fully tested. `access.ts`: when a subscription gives access                       |
+| `src/lib/access.ts`                                 | `isStudentActive(studentId)`: the single source of truth for access                                    |
+| `src/lib/payments/`                                 | `PaymentProvider` interface with Stripe, Paystack and Manual implementations; webhook handling         |
+| `src/app/api/webhooks/`                             | Stripe and Paystack webhook endpoints                                                                  |
+| `src/app/sponsor/[code]/`                           | "Get sponsored" page: starts Stripe Checkout for one student                                           |
+| `src/app/page.tsx`                                  | Landing page: tagline, prices by region, free trial, FAQ                                               |
+| `src/app/app/`                                      | Payer app: sign-in, onboarding, children, plans, dashboard, weekly report, settings, groups            |
+| `src/app/consent/[token]/`, `src/app/join/[token]/` | Public pages: guardian consent, joining a group by invite link                                         |
+| `src/lib/rules/progress.ts`                         | Dots, streak, accuracy trend, weakest topics, weekly report and its WhatsApp text                      |
+| `src/proxy.ts`                                      | Refreshes the Supabase session and guards /app                                                         |
+| `src/lib/engine/`                                   | Practice engine shared by bot and web: daily set, mastery and spaced review, bank runway, session flow |
+| `src/lib/practice/`                                 | Practice data access, signed links and the web page (`web.ts`, `web-html.ts`)                          |
+| `src/app/p/[token]/`                                | Web practice page (juniors, and seniors when WhatsApp is down): plain HTML, a few KB per load          |
+| `src/app/admin/practice-links/`                     | Admin: today's practice links for every active student, in one click                                   |
+| `src/lib/whatsapp/`                                 | WhatsApp bot: webhook parsing, job table, bot logic, outbox (24-hour window, STOP), simulator          |
+| `src/app/api/whatsapp/`                             | Meta webhook (verification and inbound messages)                                                       |
+| `src/app/admin/dev/whatsapp/`                       | WhatsApp simulator for admins                                                                          |
+| `supabase/migrations/`                              | Database schema, RLS policies and billing functions                                                    |
+| `test/`                                             | Database and end-to-end payment tests (PGlite), shared test helpers                                    |
+| `scripts/`                                          | Database push, dev seed, Paystack plan setup                                                           |
+| `e2e/`                                              | Playwright tests; `e2e/support/db-server.ts` serves an in-memory Postgres (PGlite) for them            |
 
 ## Payments in one paragraph
 

@@ -7,6 +7,7 @@ import { SessionList, Stat, WeakTopics, WeekDots } from "@/components/progress";
 import { ButtonLink, Card, Notice, styles } from "@/components/ui";
 import { requirePayer } from "@/lib/auth";
 import { answerHistory, getChild, pendingConsentRequest } from "@/lib/data/children";
+import { streakThreshold } from "@/lib/data/settings";
 import { childAccess } from "@/lib/data/status";
 import { EXAM_LABELS } from "@/lib/labels";
 import { todayPracticeUrl } from "@/lib/practice/server";
@@ -45,10 +46,11 @@ export default async function ChildDashboard({
 
   const now = new Date();
   const today = lagosDay(now);
-  const [answers, status, pendingConsent] = await Promise.all([
+  const [answers, status, pendingConsent, threshold] = await Promise.all([
     answerHistory(id, now),
     childAccess(id, now),
     isOwner ? pendingConsentRequest(id) : Promise.resolve(null),
+    streakThreshold(),
   ]);
   const thisWeek = answers.filter((a) => weekStart(lagosDay(a.answeredAt)) === weekStart(today));
   const eightWeeks = weeklyAccuracy(answers, today);
@@ -126,9 +128,9 @@ export default async function ChildDashboard({
 
       <Card>
         <h2 className="mb-3 font-semibold text-navy-dark">This week</h2>
-        <WeekDots dots={weekDots(answers, today)} />
+        <WeekDots dots={weekDots(answers, today, threshold)} threshold={threshold} />
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Stat value={currentStreak(answers, today)} label="day streak" />
+          <Stat value={currentStreak(answers, today, threshold)} label="day streak" />
           <Stat value={thisWeek.length} label="questions this week" />
         </div>
       </Card>

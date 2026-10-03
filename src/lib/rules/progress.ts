@@ -2,7 +2,8 @@ import { STREAK_DAY_THRESHOLD, type Subject } from "@/config/pilot";
 import { addDays, lagosDay, weekDays, weekStart, type Day } from "./days";
 
 // Progress figures for the payer dashboard and the weekly report. Everything is derived from the
-// student's answers; a day "counts" (dot filled, streak kept) at STREAK_DAY_THRESHOLD answers.
+// student's answers; a day "counts" (dot filled, streak kept) at the streak threshold: the admin
+// setting "streak_day_threshold", STREAK_DAY_THRESHOLD (5) unless changed.
 
 export type AnswerRow = {
   answeredAt: Date;
@@ -33,11 +34,15 @@ function accuracy(t: Tally): number | null {
 export type WeekDot = { day: Day; practised: boolean; today: boolean; future: boolean };
 
 /** This week's seven dots, Monday to Sunday. */
-export function weekDots(answers: readonly AnswerRow[], today: Day): WeekDot[] {
+export function weekDots(
+  answers: readonly AnswerRow[],
+  today: Day,
+  threshold: number = STREAK_DAY_THRESHOLD,
+): WeekDot[] {
   const byDay = tallyByDay(answers);
   return weekDays(weekStart(today)).map((day) => ({
     day,
-    practised: (byDay.get(day)?.answered ?? 0) >= STREAK_DAY_THRESHOLD,
+    practised: (byDay.get(day)?.answered ?? 0) >= threshold,
     today: day === today,
     future: day > today,
   }));
@@ -47,9 +52,13 @@ export function weekDots(answers: readonly AnswerRow[], today: Day): WeekDot[] {
  * Consecutive practice days up to today. Today not yet done doesn't break the streak (the student
  * still has until Lagos midnight), so counting starts from yesterday in that case.
  */
-export function currentStreak(answers: readonly AnswerRow[], today: Day): number {
+export function currentStreak(
+  answers: readonly AnswerRow[],
+  today: Day,
+  threshold: number = STREAK_DAY_THRESHOLD,
+): number {
   const byDay = tallyByDay(answers);
-  const counts = (day: Day) => (byDay.get(day)?.answered ?? 0) >= STREAK_DAY_THRESHOLD;
+  const counts = (day: Day) => (byDay.get(day)?.answered ?? 0) >= threshold;
   let day = counts(today) ? today : addDays(today, -1);
   let streak = 0;
   while (counts(day)) {
@@ -162,7 +171,11 @@ export type WeeklyReport = {
  * The Monday-to-Sunday report (Lagos days). `answers` should reach back far enough for the
  * streak; only the week's answers count towards the other figures.
  */
-export function weeklyReport(answers: readonly AnswerRow[], monday: Day): WeeklyReport {
+export function weeklyReport(
+  answers: readonly AnswerRow[],
+  monday: Day,
+  threshold: number = STREAK_DAY_THRESHOLD,
+): WeeklyReport {
   const sunday = addDays(monday, 6);
   const inWeek = answers.filter((a) => {
     const day = lagosDay(a.answeredAt);
@@ -182,13 +195,13 @@ export function weeklyReport(answers: readonly AnswerRow[], monday: Day): Weekly
   return {
     weekStart: monday,
     weekEnd: sunday,
-    daysPractised: weekDots(inWeek, sunday).filter((d) => d.practised).length,
+    daysPractised: weekDots(inWeek, sunday, threshold).filter((d) => d.practised).length,
     answered: total.answered,
     accuracy: accuracy(total),
     bySubject: [...bySubject.entries()]
       .map(([subject, t]) => ({ subject, answered: t.answered, accuracy: accuracy(t) }))
       .sort((a, b) => b.answered - a.answered),
-    streak: currentStreak(upToSunday, sunday),
+    streak: currentStreak(upToSunday, sunday, threshold),
     weakestTopics: weakestTopics(inWeek, { minAttempts: 2 }),
   };
 }

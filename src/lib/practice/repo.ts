@@ -96,14 +96,14 @@ export async function createSession(
   studentId: string,
   channel: Channel,
   day: string,
-  questionIds: string[],
+  set: readonly { questionId: string; reason: string }[],
   at: Date,
 ): Promise<Session> {
   await sql.query(
-    `insert into public.practice_sessions (student_id, channel, started_at, lagos_day, question_ids)
-     values ($1, $2, $3, $4, $5::uuid[])
+    `insert into public.practice_sessions (student_id, channel, started_at, lagos_day, question_ids, pick_reasons)
+     values ($1, $2, $3, $4, $5::uuid[], $6::text[])
      on conflict do nothing`,
-    [studentId, channel, at, day, questionIds],
+    [studentId, channel, at, day, set.map((p) => p.questionId), set.map((p) => p.reason)],
   );
   return (await todaySession(sql, studentId, channel, day))!;
 }
@@ -116,37 +116,6 @@ export async function questionsPerDay(sql: Sql): Promise<number> {
   return Number.isInteger(n) && n >= 1
     ? Math.min(n, QUESTIONS_PER_DAY.max)
     : QUESTIONS_PER_DAY.default;
-}
-
-/**
- * Today's set: approved questions only, in the student's subjects, ones they haven't seen first,
- * spread across subjects in turn.
- */
-export async function pickQuestions(
-  sql: Sql,
-  student: Pick<PracticeStudent, "id" | "subjects">,
-  count: number,
-): Promise<string[]> {
-  const rows = await sql.query<{ id: string; subject: string; seen: boolean }>(
-    `select q.id::text, q.subject::text,
-            exists (select 1 from public.answers a where a.student_id = $1 and a.question_id = q.id) as seen
-     from public.questions q
-     where q.status = 'approved' and q.subject::text = any($2::text[])
-     order by seen, random()
-     limit $3`,
-    [student.id, student.subjects, count * 6],
-  );
-  const bySubject = new Map<string, string[]>();
-  for (const r of rows) bySubject.set(r.subject, [...(bySubject.get(r.subject) ?? []), r.id]);
-  const queues = [...bySubject.values()];
-  const picked: string[] = [];
-  while (picked.length < count && queues.some((q) => q.length > 0)) {
-    for (const q of queues) {
-      const id = q.shift();
-      if (id && picked.length < count) picked.push(id);
-    }
-  }
-  return picked;
 }
 
 export type Question = {

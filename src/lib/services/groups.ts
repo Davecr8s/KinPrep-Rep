@@ -1,7 +1,7 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { STREAK_DAY_THRESHOLD } from "@/config/pilot";
+import { streakThreshold } from "@/lib/data/settings";
 import { adminDb } from "@/lib/db/admin";
 import { evaluateAccess } from "@/lib/rules/access";
 import { lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
@@ -158,7 +158,7 @@ export async function weekLeaderboard(
   const { data, error } = await db.rpc("group_week_stats", {
     p_group_id: groupId,
     p_since: lagosDayStart(weekStart(lagosDay(now))).toISOString(),
-    p_day_threshold: STREAK_DAY_THRESHOLD,
+    p_day_threshold: await streakThreshold(),
   });
   if (error) throw new Error(error.message);
   return StatsSchema.parse(data)

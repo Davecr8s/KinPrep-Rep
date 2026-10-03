@@ -8,7 +8,7 @@ import {
   markAnswer,
   setSummary,
   startOrResumeSet,
-} from "@/lib/practice/engine";
+} from "@/lib/engine/session";
 import { prewrittenAlternative, type ExplainAnotherWay } from "@/lib/practice/explain";
 import {
   accessStore,
@@ -23,7 +23,7 @@ import {
   type Session,
 } from "@/lib/practice/repo";
 import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
-import { currentStreak, weekDots } from "@/lib/rules/progress";
+import { currentStreak, streakThreshold, weekDots } from "@/lib/engine";
 import { parseReply, parseText, replyIds, type Intent } from "./commands";
 import { LIMITS, truncate, type Outbound } from "./messages";
 import type { Outbox } from "./outbox";
@@ -420,8 +420,9 @@ async function streak(ctx: Ctx): Promise<void> {
     ctx.student.id,
     lagosDayStart(addDays(ctx.day, -120)),
   );
-  const days = currentStreak(history, ctx.day);
-  const dots = weekDots(history, ctx.day)
+  const threshold = await streakThreshold(ctx.sql);
+  const days = currentStreak(history, ctx.day, threshold);
+  const dots = weekDots(history, ctx.day, threshold)
     .map((d, i) => `${"MTWTFSS"[i]}${d.practised ? "✅" : d.future ? "▫️" : "⬜"}`)
     .join(" ");
   await ctx.send(text(`🔥 Streak: ${days} ${days === 1 ? "day" : "days"}\n\nThis week: ${dots}`));

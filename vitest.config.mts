@@ -17,10 +17,19 @@ export default defineConfig({
     hookTimeout: 60_000,
     coverage: {
       provider: "v8",
-      include: ["src/lib/rules/**", "src/config/**"],
+      include: [
+        "src/lib/rules/**",
+        "src/config/**",
+        "src/lib/engine/select.ts",
+        "src/lib/engine/mastery.ts",
+        "src/lib/engine/runway.ts",
+      ],
       exclude: ["**/*.test.ts"],
-      // Business rules must be fully tested (CLAUDE.md, BUILD_PLAN Phase 2).
-      thresholds: { "src/lib/rules/**": { lines: 100, branches: 100, functions: 100 } },
+      // Business rules and the engine's decisions must be fully tested (CLAUDE.md, Phase 2).
+      thresholds: {
+        "src/lib/rules/**": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/engine/{select,mastery,runway}.ts": { lines: 100, branches: 100, functions: 100 },
+      },
     },
   },
 });

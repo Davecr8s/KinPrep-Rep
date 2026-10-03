@@ -6,7 +6,14 @@ import type { SessionSummary, TopicAccuracy, WeekDot } from "@/lib/rules/progres
 
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
 
-export function WeekDots({ dots }: { dots: WeekDot[] }) {
+export function WeekDots({
+  dots,
+  threshold = STREAK_DAY_THRESHOLD,
+}: {
+  dots: WeekDot[];
+  /** The streak setting the dots were worked out with. */
+  threshold?: number;
+}) {
   const done = dots.filter((d) => d.practised).length;
   return (
     <div>
@@ -51,7 +58,7 @@ export function WeekDots({ dots }: { dots: WeekDot[] }) {
         })}
       </ol>
       <p className="mt-2 text-sm text-navy-dark/70">
-        A dot fills in at {STREAK_DAY_THRESHOLD} questions in a day (Lagos time).
+        A dot fills in at {threshold} questions in a day (Lagos time).
       </p>
     </div>
   );

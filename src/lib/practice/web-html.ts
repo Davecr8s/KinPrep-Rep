@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { SUBJECT_LABELS } from "@/lib/labels";
 import type { WeekDot } from "@/lib/rules/progress";
-import type { League, SetSummary } from "./engine";
+import type { League, SetSummary } from "@/lib/engine/session";
 import type { Question } from "./repo";
 
 // The web practice page's HTML. Hand-written, with inline CSS and ~1 KB of script, so a load is

@@ -9,7 +9,7 @@ import {
   markAnswer,
   setSummary,
   startOrResumeSet,
-} from "./engine";
+} from "@/lib/engine/session";
 import { prewrittenAlternative, type ExplainAnotherWay } from "./explain";
 import { verifyPracticeLink, type PracticeLink } from "./links";
 import {

@@ -1,5 +1,6 @@
 import type { Sql } from "@/lib/db/sql";
 import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
+import { buildDailySet, recordAttempt, streakThreshold } from "./index";
 import {
   currentStreak,
   weakestTopics,
@@ -12,8 +13,6 @@ import {
   createSession,
   getQuestion,
   league,
-  pickQuestions,
-  questionsPerDay,
   SESSION_COLUMNS,
   todaySession,
   type Channel,
@@ -21,17 +20,17 @@ import {
   type PracticeStudent,
   type Question,
   type Session,
-} from "./repo";
+} from "@/lib/practice/repo";
 
-// The daily-set engine, shared by every channel (WhatsApp bot, web practice page) so a set,
-// its marking and its summary are the same wherever the student practises. Every state change
+// The session flow, shared by every channel (WhatsApp bot, web practice page) so a set, its
+// marking and its summary are the same wherever the student practises. Every state change
 // names the position it applies to, so a double tap, a resent request after a dropped
 // connection or an old WhatsApp button is a harmless no-op.
 
 export type StartResult =
   { kind: "started" | "resumed"; session: Session } | { kind: "noQuestions" };
 
-/** Today's set on this channel, created (approved questions only) if there isn't one yet. */
+/** Today's set on this channel, built by buildDailySet if there isn't one yet. */
 export async function startOrResumeSet(
   sql: Sql,
   student: PracticeStudent,
@@ -41,11 +40,11 @@ export async function startOrResumeSet(
 ): Promise<StartResult> {
   const existing = await todaySession(sql, student.id, channel, day);
   if (existing) return { kind: "resumed", session: existing };
-  const ids = await pickQuestions(sql, student, await questionsPerDay(sql));
-  if (ids.length === 0) return { kind: "noQuestions" };
+  const plan = await buildDailySet(sql, student.id, day);
+  if (plan.picks.length === 0) return { kind: "noQuestions" };
   return {
     kind: "started",
-    session: await createSession(sql, student.id, channel, day, ids, now),
+    session: await createSession(sql, student.id, channel, day, plan.picks, now),
   };
 }
 
@@ -84,6 +83,12 @@ export async function markAnswer(
        values ($1, $2, $3, $4, $5, $6) on conflict (session_id, question_id) do nothing`,
       [input.session.id, input.studentId, question.id, input.option, correct, input.now],
     );
+    await recordAttempt(tx, {
+      studentId: input.studentId,
+      questionId: question.id,
+      correct,
+      at: input.now,
+    });
     return true;
   });
   return claimed ? { kind: "marked", question, chosen: input.option, correct } : { kind: "stale" };
@@ -140,11 +145,12 @@ export async function setSummary(
 ): Promise<SetSummary> {
   const history = await answerHistory(sql, studentId, lagosDayStart(addDays(day, -120)));
   const set = history.filter((a) => a.sessionId === sessionId);
+  const threshold = await streakThreshold(sql);
   return {
     correct: set.filter((a) => a.correct).length,
     answered: set.length,
-    streak: currentStreak(history, day),
-    week: weekDots(history, day),
+    streak: currentStreak(history, day, threshold),
+    week: weekDots(history, day, threshold),
     focus: weakestTopics(
       history.filter((a) => lagosDay(a.answeredAt) >= addDays(day, -28)),
       { minAttempts: 2, limit: 1 },
