@@ -23,6 +23,10 @@
       "schedule": "0 20 * * *"
     },
     {
+      "path": "/api/jobs/maintenance",
+      "schedule": "0 2 * * *"
+    },
+    {
       "path": "/api/jobs/weekly-reports",
       "schedule": "0 17 * * 6"
     },

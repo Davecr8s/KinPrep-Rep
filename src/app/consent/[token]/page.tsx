@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FieldError, Notice, styles } from "@/components/ui";
 import { CONSENT_POINTS } from "@/lib/consent";
 import { findConsentRequest } from "@/lib/services/students";
@@ -58,6 +59,13 @@ export default async function GuardianConsentPage({
           </li>
         ))}
       </ul>
+      <p className="text-sm">
+        How we use and protect this:{" "}
+        <Link href="/privacy" target="_blank" className="underline">
+          privacy notice
+        </Link>
+        .
+      </p>
       <form action={acceptConsent.bind(null, token)} className="mt-6 flex flex-col gap-4">
         <label className="flex cursor-pointer gap-3">
           <input type="checkbox" name="agree" className="mt-1 size-5 shrink-0 accent-navy" />
@@ -65,7 +73,15 @@ export default async function GuardianConsentPage({
             I am {request.firstName}&apos;s parent or legal guardian and I agree.
           </span>
         </label>
-        <FieldError message={query.error === "tick" ? "Tick the box to agree." : undefined} />
+        <FieldError
+          message={
+            query.error === "tick"
+              ? "Tick the box to agree."
+              : query.error === "rate"
+                ? "Too many attempts. Please wait a few minutes and try again."
+                : undefined
+          }
+        />
         <button type="submit" className={styles.primaryButton}>
           I agree
         </button>

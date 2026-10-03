@@ -1,5 +1,6 @@
 "use server";
 
+import { reportError } from "@/lib/monitoring/report";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOwnedStudent, requirePayer } from "@/lib/auth";
@@ -105,7 +106,7 @@ export async function deleteChild(studentId: string, formData: FormData): Promis
     await deleteStudentData(studentId, user.id);
   } catch (error) {
     if (error instanceof BillingCancelError) {
-      console.error("[delete] billing cancel failed", error);
+      await reportError({ where: "action:delete", error });
       redirect(`/app/settings?error=billing&child=${studentId}#data`);
     }
     throw error;

@@ -1,0 +1,31 @@
+name: Uptime
+
+# Every 15 minutes: is the live site up, can it reach its database, do the payment and WhatsApp
+# webhook routes answer, and (with the cron secret) are any webhooks failing or stuck?
+# A failed run emails whoever last changed this schedule (GitHub's rule for scheduled
+# workflows). Runs only once the repository variable PRODUCTION_URL is set; see docs/LAUNCH.md.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the live site
+    if: vars.PRODUCTION_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-site.mjs --url "${{ vars.PRODUCTION_URL }}" --uptime
+        env:
+          # Webhook routes that must have their keys, e.g. "stripe,paystack,whatsapp".
+          UPTIME_REQUIRE: ${{ vars.UPTIME_REQUIRE }}
+          CRON_SECRET: ${{ secrets.PRODUCTION_CRON_SECRET }}

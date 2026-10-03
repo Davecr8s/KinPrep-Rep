@@ -1,5 +1,6 @@
 "use server";
 
+import { reportError } from "@/lib/monitoring/report";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { requireOwnedStudent, requirePayer } from "@/lib/auth";
@@ -42,7 +43,7 @@ export async function buySeats(groupId: string, formData: FormData): Promise<nev
     url = result.url;
   } catch (error) {
     unstable_rethrow(error);
-    console.error("[groups] seat checkout failed", error);
+    await reportError({ where: "action:groups", error });
     redirect("/app/groups?error=checkout#seats");
   }
   redirect(url);

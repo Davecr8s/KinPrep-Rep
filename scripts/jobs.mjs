@@ -6,7 +6,7 @@
 //   npm run jobs -- weekly-reports --dry-run --at 2026-10-11T18:00:00+01:00
 //   npm run jobs -- reminder                     (for real: sends)
 //   npm run jobs -- worker                       (send anything waiting in the queue)
-// Jobs: morning, junior-links, reminder, missed-days, weekly-reports, worker.
+// Jobs: morning, junior-links, reminder, missed-days, weekly-reports, worker, maintenance.
 // Reads CRON_SECRET and NEXT_PUBLIC_APP_URL from .env.local; --url overrides the site.
 
 const args = process.argv.slice(2);
@@ -22,7 +22,7 @@ const secret = process.env.CRON_SECRET;
 
 if (!job) {
   console.error(
-    "Which job? morning, junior-links, reminder, missed-days, weekly-reports or worker.",
+    "Which job? morning, junior-links, reminder, missed-days, weekly-reports, worker or maintenance.",
   );
   process.exit(1);
 }

@@ -1,0 +1,69 @@
+name: Preview checks
+
+# After Vercel finishes a deploy, check it from the outside.
+#  - Smoke test, every deploy: pages, security headers, health, webhook routes, guards refuse.
+#  - Full journey, previews only, once the test-key secrets are set and the repository variable
+#    E2E_PREVIEW is 1 (docs/LAUNCH.md, "Preview end-to-end test"): a sponsor signs up, adds a
+#    child, pays in Stripe test mode, the child practises a day in the WhatsApp simulator, and
+#    the weekly report is generated.
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Deployment URL to check, e.g. https://kinprep-rep-git-<branch>-<team>.vercel.app"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ inputs.url || github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-site.mjs --url "$SITE_URL" --smoke
+
+  journey:
+    name: Full journey on the preview (test keys)
+    needs: smoke
+    if: >-
+      vars.E2E_PREVIEW == '1' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.deployment_status.environment == 'Preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_FULL: "1"
+      E2E_BASE_URL: ${{ inputs.url || github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      # The same values as Vercel's Preview environment (a test Supabase project, Stripe test mode).
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_SUPABASE_SECRET_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.PREVIEW_STRIPE_SECRET_KEY }}
+      CRON_SECRET: ${{ secrets.PREVIEW_CRON_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/launch-journey.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: launch-journey-report
+          path: playwright-report/
+          retention-days: 7

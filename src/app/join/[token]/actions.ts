@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import type { ChildFormState } from "@/components/child-fields";
 import { assignSeat, findGroupInvite } from "@/lib/services/groups";
+import { withinLimit } from "@/lib/security/server";
 import { createStudent, recordConsent } from "@/lib/services/students";
 import { childSchema, fieldErrors } from "@/lib/validation/forms";
 
@@ -37,6 +38,12 @@ export async function joinGroup(
   if (values.consent !== "on")
     errors.consent = "As the child's parent or guardian, tick the box to agree.";
   if (!child.success || errors.consent) return { values, errors };
+  if (!(await withinLimit("joinGroup"))) {
+    return {
+      values,
+      errors: { consent: "Too many attempts. Please wait a few minutes and try again." },
+    };
+  }
 
   const studentId = await createStudent(child.data, {
     ownerId: invite!.ownerId,

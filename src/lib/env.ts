@@ -69,6 +69,17 @@ export const envGroups = {
     LLM_API_KEY: secret,
     LLM_MODEL: secret,
   }),
+  // Error monitoring (src/lib/monitoring): Sentry > Project settings > Client keys (DSN). Read
+  // straight from process.env so reporting works even when other config is broken; listed here
+  // so /api/health can say whether it's set.
+  monitoring: z.object({
+    SENTRY_DSN: z.url(),
+    SENTRY_ENVIRONMENT: z.string().min(1).optional(),
+  }),
+  // HMAC key for rate-limit counters (src/lib/security). Falls back to CRON_SECRET if unset.
+  rateLimit: z.object({
+    RATE_LIMIT_SECRET: z.string().min(32),
+  }),
 } as const;
 
 export type EnvGroup = keyof typeof envGroups;

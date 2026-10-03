@@ -1,5 +1,6 @@
 "use server";
 
+import { reportError } from "@/lib/monitoring/report";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { requireOwnedStudent } from "@/lib/auth";
@@ -73,7 +74,7 @@ export async function startPlanCheckout(studentId: string, formData: FormData): 
     }
   } catch (error) {
     unstable_rethrow(error);
-    console.error("[plan] checkout failed", error);
+    await reportError({ where: "action:plan", error });
     redirect(`${planPage}?error=checkout`);
   }
 

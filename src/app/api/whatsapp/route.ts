@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { after, type NextRequest } from "next/server";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
+import { reportError } from "@/lib/monitoring/report";
+import { limitRequest } from "@/lib/security/server";
 import { enqueueInbound } from "@/lib/whatsapp/jobs";
 import { runPendingJobs } from "@/lib/whatsapp/server";
 import { parseInbound, verifyMetaSignature } from "@/lib/whatsapp/webhook";
@@ -11,6 +13,8 @@ export const maxDuration = 60;
 
 /** Meta's subscription check: echo hub.challenge if the verify token matches. */
 export async function GET(request: NextRequest) {
+  const limited = await limitRequest(request, "webhook");
+  if (limited) return limited;
   const params = request.nextUrl.searchParams;
   const token = params.get("hub.verify_token") ?? "";
   const expected = serverEnv("whatsapp").WHATSAPP_VERIFY_TOKEN;
@@ -28,6 +32,8 @@ export async function GET(request: NextRequest) {
  * is the key, so retries are ignored), answer 200 at once, then process after the response.
  */
 export async function POST(request: NextRequest) {
+  const limited = await limitRequest(request, "webhook");
+  if (limited) return limited;
   const rawBody = await request.text();
   const { WHATSAPP_APP_SECRET } = serverEnv("whatsapp");
   if (
@@ -48,7 +54,7 @@ export async function POST(request: NextRequest) {
     try {
       await runPendingJobs();
     } catch (error) {
-      console.error("[whatsapp] processing failed", error);
+      await reportError({ where: "webhook:whatsapp", error });
     }
   });
   return Response.json({ received: messages.length, new: added });

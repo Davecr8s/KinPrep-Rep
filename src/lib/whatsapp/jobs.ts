@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/monitoring/report";
 import type { Sql } from "@/lib/db/sql";
 import { handleInbound, type BotDeps } from "./bot";
 import type { InboundMessage } from "./webhook";
@@ -87,7 +88,7 @@ export async function processJobs(
         [job.message_id],
       );
     } catch (error) {
-      console.error("[whatsapp] job failed", job.message_id, error);
+      await reportError({ where: "whatsapp:job", error, tags: { attempt: String(job.attempts) } });
       await sql.query("update public.wa_jobs set status = $2, error = $3 where message_id = $1", [
         job.message_id,
         job.attempts >= MAX_ATTEMPTS ? "failed" : "pending",

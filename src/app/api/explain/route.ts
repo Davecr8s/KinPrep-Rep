@@ -2,6 +2,7 @@ import { handleExplainPost } from "@/lib/ai/explain";
 import { explainModel } from "@/lib/ai/server";
 import { appSql } from "@/lib/db/postgres";
 import { serverEnv } from "@/lib/env";
+import { limitRequest } from "@/lib/security/server";
 
 // POST /api/explain: "Explain another way" for one question. The bot and the web page call the
 // same code in-process (src/lib/ai/explain.ts); this endpoint is for the practice page's own
@@ -12,6 +13,8 @@ import { serverEnv } from "@/lib/env";
 const MAX_BODY = 2_000;
 
 export async function POST(request: Request) {
+  const limited = await limitRequest(request, "explain");
+  if (limited) return limited;
   const raw = await request.text();
   if (raw.length > MAX_BODY) return Response.json({ error: "Too large" }, { status: 413 });
   let body: unknown;

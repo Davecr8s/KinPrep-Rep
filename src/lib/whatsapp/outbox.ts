@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Sql } from "@/lib/db/sql";
+import { studentMessageProblem, type StudentAtNumber } from "@/lib/rules/messaging";
 import { assertValid, toCloudPayload, type Outbound } from "./messages";
 import { canSendFreeform } from "./window";
 
@@ -63,8 +64,9 @@ export type Delivery = { status: SendResult; waId?: string; error?: string };
 
 /**
  * The only way the bot sends anything. Enforces the WhatsApp rules (CLAUDE.md): STOP blocks every
- * business-started message, and free-form messages need the 24-hour window; outside it only
- * approved templates go out. Everything is written to message_log, blocked attempts included.
+ * business-started message, free-form messages need the 24-hour window (outside it only
+ * approved templates go out), and nothing about a student goes out without guardian consent or
+ * to a child under 13 (src/lib/rules/messaging.ts). Everything is written to message_log, blocked attempts included.
  */
 export function createOutbox(deps: { sql: Sql; transport: Transport; now?: () => Date }) {
   const now = deps.now ?? (() => new Date());
@@ -97,6 +99,37 @@ export function createOutbox(deps: { sql: Sql; transport: Transport; now?: () =>
     );
   }
 
+  /** The students this message is about or whose own number it goes to (rules/messaging.ts). */
+  async function studentsAt(phone: string, studentId: string | null): Promise<StudentAtNumber[]> {
+    const rows = await deps.sql.query<{
+      about: boolean;
+      own_number: boolean;
+      senior: boolean;
+      consented: boolean;
+      payer_number: boolean;
+    }>(
+      `select coalesce(s.id = $2::uuid, false) as about,
+              coalesce(s.whatsapp_number = $1, false) as own_number,
+              public.is_senior_birth_year(s.birth_year, $3) as senior,
+              coalesce((select c.event = 'granted' from public.guardian_consents c
+                        where c.student_id = s.id order by c.created_at desc limit 1), false) as consented,
+              exists (select 1 from public.payers p
+                      where p.whatsapp_number = $1
+                        and (p.id = s.owner_id or exists (select 1 from public.student_viewers v
+                                                          where v.student_id = s.id and v.viewer_id = p.id))) as payer_number
+       from public.students s
+       where s.whatsapp_number = $1 or s.id = $2::uuid`,
+      [phone, studentId, now()],
+    );
+    return rows.map((r) => ({
+      about: r.about,
+      ownNumber: r.own_number,
+      senior: r.senior,
+      consented: r.consented,
+      payerNumber: r.payer_number,
+    }));
+  }
+
   async function deliver(
     phone: string,
     message: Outbound,
@@ -114,6 +147,12 @@ export function createOutbox(deps: { sql: Sql; transport: Transport; now?: () =>
       !canSendFreeform({ lastInboundAt: contact?.last_inbound_at ?? null }, now())
     ) {
       blocked = "outside the 24-hour window; only templates allowed";
+    }
+    if (!blocked) {
+      blocked = studentMessageProblem(
+        await studentsAt(phone, options.studentId ?? null),
+        options.businessInitiated ?? false,
+      );
     }
     const extra = { studentId: options.studentId, meta: options.meta };
     if (blocked) {

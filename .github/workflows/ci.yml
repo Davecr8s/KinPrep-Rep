@@ -20,6 +20,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # No API keys or passwords in the repository (scripts/scan-secrets.mjs).
+      - run: node scripts/scan-secrets.mjs
+      # Known high-severity vulnerabilities in what we ship (dev tools excluded).
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck

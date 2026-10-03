@@ -1,0 +1,88 @@
+name: Database backup
+
+# Daily at 02:30 UTC (03:30 Lagos): an encrypted copy of the production database, kept outside
+# Supabase. This is the second copy; Supabase's own daily backups (Pro plan) are the first.
+# Needs these repository secrets (docs/LAUNCH.md, "Backups"):
+#   BACKUP_DATABASE_URL  Supabase > Connect > Session pooler (port 5432) URI, with the password
+#   BACKUP_PASSPHRASE    a long random passphrase, also kept in the founder's password manager
+# Recommended, to keep copies in your own S3-compatible bucket (e.g. Cloudflare R2):
+#   BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Match the Postgres major version of the Supabase project (Dashboard > Settings > Infrastructure).
+  PG_MAJOR: "17"
+
+jobs:
+  backup:
+    name: Dump, encrypt and store
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+    steps:
+      - name: Check the secrets are set
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::warning::BACKUP_DATABASE_URL and BACKUP_PASSPHRASE are not set; no backup taken."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Dump the public schema and the sign-in accounts
+        if: env.SKIP != '1'
+        run: |
+          echo "STAMP=$(date -u +%Y-%m-%dT%H%MZ)" >> "$GITHUB_ENV"
+          mkdir -p backup
+          docker run --rm -e DATABASE_URL -v "$PWD/backup:/backup" "postgres:${PG_MAJOR}" sh -c '
+            set -e
+            pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges \
+              --schema=public --file=/backup/public.dump
+            pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --data-only \
+              --table=auth.users --table=auth.identities --file=/backup/auth.dump
+            pg_restore --list /backup/public.dump > /backup/public.list
+            pg_restore --list /backup/auth.dump > /backup/auth.list
+          '
+          # The archive is readable and holds the tables that matter most.
+          for t in students guardian_consents subscriptions payments answers questions audit_log; do
+            grep -q "TABLE DATA public $t " backup/public.list || { echo "missing table $t"; exit 1; }
+          done
+          ls -la backup
+
+      - name: Encrypt
+        if: env.SKIP != '1'
+        run: |
+          printf '%s' "$PASSPHRASE" > passphrase.txt
+          tar -C backup -cf - public.dump auth.dump \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                  --passphrase-file passphrase.txt --output "kinprep-db-$STAMP.tar.gpg"
+          rm -rf backup passphrase.txt
+          ls -la kinprep-db-*.tar.gpg
+
+      - name: Store in S3-compatible storage
+        if: env.SKIP != '1' && env.BACKUP_S3_BUCKET != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          aws s3 cp "kinprep-db-$STAMP.tar.gpg" "s3://$BACKUP_S3_BUCKET/daily/" --endpoint-url "$ENDPOINT"
+
+      # Encrypted, but this repository is public, and anyone signed in to GitHub can download a
+      # public repository's artifacts. Make the S3 copy the real one, or make the repo private.
+      - name: Keep as an artifact (7 days)
+        if: env.SKIP != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinprep-db-${{ env.STAMP }}
+          path: kinprep-db-*.tar.gpg
+          retention-days: 7

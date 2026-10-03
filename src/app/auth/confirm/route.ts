@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { limitRequest } from "@/lib/security/server";
 import { userDb } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/tokens";
 
 // The magic link lands here: verify the token hash, set the session cookie, go on to `next`.
 // Works even if the email is opened in a different browser from the one that asked for it.
 export async function GET(request: NextRequest) {
+  const limited = await limitRequest(request, "authConfirm");
+  if (limited) return limited;
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");

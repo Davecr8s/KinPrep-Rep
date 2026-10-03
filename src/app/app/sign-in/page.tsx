@@ -55,7 +55,15 @@ export default async function SignInPage({ searchParams }: PageProps<"/app/sign-
         </button>
       </form>
       <p className="mt-6 text-sm text-navy-dark/70">
-        By continuing you agree to KinPrep&apos;s terms and privacy policy.
+        By continuing you agree to KinPrep&apos;s{" "}
+        <Link href="/terms" className={styles.link}>
+          terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className={styles.link}>
+          privacy notice
+        </Link>
+        .
       </p>
     </main>
   );

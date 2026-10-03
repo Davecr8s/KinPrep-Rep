@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { ChildFields, type ChildFormState } from "@/components/child-fields";
 import { FieldError, styles } from "@/components/ui";
 import { CONSENT_POINTS } from "@/lib/consent";
@@ -52,6 +53,13 @@ export function AddChildForm({ lagosYear }: { lagosYear: number }) {
                 <li key={p}>{p}</li>
               ))}
             </ul>
+            <p className="text-sm">
+              How we use and protect this:{" "}
+              <Link href="/privacy" target="_blank" className="underline">
+                privacy notice
+              </Link>
+              .
+            </p>
             <label className="flex cursor-pointer gap-3">
               <input type="checkbox" name="consent" className="mt-1 size-5 shrink-0 accent-navy" />
               <span className="font-semibold">

@@ -39,7 +39,9 @@ export default async function CheckEmailPage({ searchParams }: PageProps<"/app/s
             message={
               query.error === "code"
                 ? "That code didn't work. Check it, or ask for a new email."
-                : undefined
+                : query.error === "rate"
+                  ? "Too many tries. Please wait a few minutes, or ask for a new email."
+                  : undefined
             }
           />
         </label>

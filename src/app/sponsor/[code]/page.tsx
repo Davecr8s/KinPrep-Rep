@@ -9,6 +9,8 @@ import { isSponsorCodeShape } from "@/lib/payments/codes";
 import { DEFAULT_BILLING } from "@/lib/payments/billing-settings";
 import { priceFor } from "@/lib/payments/plans";
 import { getBillingStore } from "@/lib/payments/server";
+import { withinLimit } from "@/lib/security/server";
+import { TooManyRequests } from "@/components/too-many";
 import { startSponsorCheckout } from "./actions";
 
 export const metadata: Metadata = {
@@ -32,6 +34,7 @@ const ERRORS: Record<string, string> = {
   checkout: "We couldn't open the payment page. Please try again in a moment.",
   form: "Please choose a plan and currency.",
   covered: "Good news: this student's coaching is already paid for.",
+  rate: "Too many attempts from this connection. Please wait a few minutes and try again.",
 };
 
 function pickCurrency(
@@ -49,6 +52,7 @@ export default async function SponsorPage({ params, searchParams }: PageProps<"/
   const { code } = await params;
   const query = await searchParams;
   if (!isSponsorCodeShape(code)) notFound();
+  if (!(await withinLimit("sponsorView"))) return <TooManyRequests />;
   const student = await getBillingStore().findSponsorLink(code);
   if (!student) notFound();
 

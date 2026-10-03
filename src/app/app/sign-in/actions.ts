@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
+import { withinLimit } from "@/lib/security/server";
 import { userDb } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/tokens";
 
@@ -14,6 +15,10 @@ export async function sendMagicLink(formData: FormData): Promise<never> {
   const parsed = EmailSchema.safeParse({ email: String(formData.get("email") ?? "").trim() });
   if (!parsed.success) redirect(`/app/sign-in?error=email&next=${encodeURIComponent(next)}`);
   const email = parsed.data!.email.toLowerCase();
+  // Per IP and per inbox, on top of Supabase's own email limits.
+  if (!(await withinLimit("signInIp")) || !(await withinLimit("signInEmail", email))) {
+    redirect(`/app/sign-in?error=rate&next=${encodeURIComponent(next)}`);
+  }
 
   const appUrl = serverEnv("app").NEXT_PUBLIC_APP_URL;
   const db = await userDb();
@@ -51,6 +56,7 @@ export async function verifyCode(formData: FormData): Promise<never> {
   });
   const back = `/app/sign-in/check?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}&error=code`;
   if (!parsed.success) redirect(back);
+  if (!(await withinLimit("signInCode"))) redirect(`${back.replace("error=code", "error=rate")}`);
   const db = await userDb();
   const { error } = await db.auth.verifyOtp({
     email: parsed.data!.email,

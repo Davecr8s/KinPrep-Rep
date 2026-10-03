@@ -36,7 +36,13 @@ export const REPORT_TIMES = {
 } as const;
 
 export type ScheduledJob =
-  "morning" | "junior-links" | "reminder" | "missed-days" | "weekly-reports" | "worker";
+  | "morning"
+  | "junior-links"
+  | "reminder"
+  | "missed-days"
+  | "weekly-reports"
+  | "worker"
+  | "maintenance";
 
 /**
  * Vercel Cron schedule (UTC; Lagos is UTC+1 all year). Every entry runs at most once a day, so the
@@ -51,6 +57,7 @@ export function cronSchedule(): { path: string; schedule: string }[] {
     ["worker", "30 7 * * *"], // retries
     ["reminder", "0 17 * * *"], // 18:00 Lagos
     ["missed-days", "0 20 * * *"], // 21:00 Lagos
+    ["maintenance", "0 2 * * *"], // 03:00 Lagos: retention clean-up (src/lib/privacy/retention.ts)
   ];
   const weekly: string[] = [];
   for (let h = 17; h <= 23; h++) weekly.push(`0 ${h} * * 6`);
