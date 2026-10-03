@@ -10,7 +10,8 @@ import { estimateCostUsd } from "./rules";
 // them within the sending limits, retries failures with backoff, and logs every attempt with its
 // template, category and estimated cost.
 
-export type QueueJob = "morning" | "junior_link" | "reminder" | "missed_days" | "weekly_report";
+export type QueueJob =
+  "morning" | "junior_link" | "reminder" | "missed_days" | "weekly_report" | "practice_link";
 
 export type QueueItem = {
   job: QueueJob;
@@ -37,7 +38,8 @@ export type QueueItem = {
 export async function enqueue(
   sql: Sql,
   item: QueueItem,
-  options: { dryRun: boolean; now: Date },
+  /** manual: for an admin to send by hand (pilot console); the worker never sends it. */
+  options: { dryRun: boolean; now: Date; manual?: boolean },
 ): Promise<boolean> {
   if (options.dryRun) {
     const [live] = await sql.query(
@@ -66,7 +68,7 @@ export async function enqueue(
       JSON.stringify(item.payload),
       item.preview,
       item.lagosDay,
-      options.dryRun ? "dry_run" : "pending",
+      options.dryRun ? "dry_run" : options.manual ? "manual" : "pending",
       options.now,
       item.expiresAt,
     ],

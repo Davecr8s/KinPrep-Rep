@@ -114,6 +114,20 @@ async function load(token: string, deps: WebDeps): Promise<Loaded> {
       ),
     );
   }
+  if (access.paused) {
+    return stop(
+      html(
+        messagePage({
+          firstName,
+          title: "Practice is paused",
+          lines: [
+            `${firstName}'s KinPrep practice is paused for now. A parent or guardian can ask us to restart it.`,
+          ],
+        }),
+        403,
+      ),
+    );
+  }
   if (access.state === "inactive") {
     if (student.junior) {
       return stop(

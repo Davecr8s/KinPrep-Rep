@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { billingSettingsFrom } from "./billing-settings";
 import { z } from "zod";
 import {
   ApplyResultSchema,
@@ -41,6 +42,25 @@ export function createSupabaseBillingStore(db: SupabaseClient): BillingStore {
         .maybeSingle();
       if (error) fail("hasGuardianConsent", error);
       return data?.event === "granted";
+    },
+
+    async isPaused(studentId) {
+      const { data, error } = await db
+        .from("students")
+        .select("paused_at")
+        .eq("id", studentId)
+        .maybeSingle();
+      if (error) fail("isPaused", error);
+      return Boolean(data?.paused_at);
+    },
+
+    async billingSettings() {
+      const { data, error } = await db
+        .from("settings")
+        .select("key, value")
+        .in("key", ["price_overrides", "grace_days"]);
+      if (error) fail("billingSettings", error);
+      return billingSettingsFrom(data ?? []);
     },
 
     async hasAnySubscription(studentId) {

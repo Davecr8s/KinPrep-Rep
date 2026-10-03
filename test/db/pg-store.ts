@@ -1,4 +1,5 @@
 import type { PGlite } from "@electric-sql/pglite";
+import { billingSettingsFrom } from "@/lib/payments/billing-settings";
 import {
   ApplyResultSchema,
   SUBSCRIPTION_COLUMNS,
@@ -31,6 +32,19 @@ export function createPgBillingStore(db: PGlite): BillingStore {
         [studentId],
       );
       return rows[0]?.event === "granted";
+    },
+    async isPaused(studentId) {
+      const { rows } = await db.query<{ paused: boolean }>(
+        "select paused_at is not null as paused from public.students where id = $1",
+        [studentId],
+      );
+      return rows[0]?.paused ?? false;
+    },
+    async billingSettings() {
+      const { rows } = await db.query<{ key: string; value: unknown }>(
+        "select key, value from public.settings where key in ('price_overrides', 'grace_days')",
+      );
+      return billingSettingsFrom(rows);
     },
     async hasAnySubscription(studentId) {
       const { rows } = await db.query("select 1 from public.subscriptions where student_id = $1", [

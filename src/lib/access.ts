@@ -5,20 +5,25 @@ import type { BillingStore } from "@/lib/payments/types";
 
 type Options = {
   now?: Date;
-  store?: Pick<BillingStore, "getCoverages" | "hasGuardianConsent">;
+  store?: Pick<BillingStore, "getCoverages" | "hasGuardianConsent"> &
+    Partial<Pick<BillingStore, "isPaused" | "billingSettings">>;
 };
 
 /** Access state for a student, with when it ends. Used for messages like "renew by Friday". */
 export async function getStudentAccess(studentId: string, options: Options = {}): Promise<Access> {
   const now = options.now ?? new Date();
   const store = options.store ?? getBillingStore();
-  const [consented, coverages] = await Promise.all([
+  const [consented, coverages, paused, billing] = await Promise.all([
     store.hasGuardianConsent(studentId),
     store.getCoverages(studentId, now),
+    store.isPaused?.(studentId) ?? false,
+    store.billingSettings?.(),
   ]);
   // No practice and no messages until a guardian has consented (CLAUDE.md), paid or not.
   if (!consented) return { state: "inactive", until: null, awaitingConsent: true };
-  return evaluateAccess(coverages, now);
+  // Paused by an admin: nothing until they restart it.
+  if (paused) return { state: "inactive", until: null, paused: true };
+  return evaluateAccess(coverages, now, billing?.graceDays);
 }
 
 /**

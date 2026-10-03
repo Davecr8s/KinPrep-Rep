@@ -1,18 +1,33 @@
 import type { PGlite } from "@electric-sql/pglite";
-import { startFreeTrial } from "@/lib/payments/trial";
 import { addDays, lagosDay, lagosDayStart } from "@/lib/rules/days";
-import { DEMO_PAYERS, DEMO_STUDENTS } from "../../scripts/lib/demo-people";
+import {
+  DEMO_AMBASSADORS,
+  DEMO_PAYERS,
+  DEMO_STUDENTS,
+  demoBillingEvents,
+} from "../../scripts/lib/demo-people";
 import { JUNIOR_BIRTH_YEAR, SENIOR_BIRTH_YEAR } from "./harness";
-import { createPgBillingStore } from "./pg-store";
 
 // The dev seed's people (scripts/lib/demo-people.ts) in a PGlite database, as of `now`: payers,
 // students with consent and plans, opt-ins, and their recent practice.
 
-export type DemoIds = { payers: Record<string, string>; students: Record<string, string> };
+export type DemoIds = {
+  payers: Record<string, string>;
+  students: Record<string, string>;
+  ambassadors: Record<string, string>;
+};
 
 export async function seedDemoPeople(db: PGlite, now: Date): Promise<DemoIds> {
   const today = lagosDay(now);
-  const ids: DemoIds = { payers: {}, students: {} };
+  const ids: DemoIds = { payers: {}, students: {}, ambassadors: {} };
+  for (const a of DEMO_AMBASSADORS) {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.ambassadors (name, code, payout_country, payout_method)
+       values ($1, $2, $3, $4) returning id::text`,
+      [a.name, a.code, a.payoutCountry, a.payoutMethod],
+    );
+    ids.ambassadors[a.code] = rows[0]!.id;
+  }
   for (const p of DEMO_PAYERS) {
     const { rows } = await db.query<{ id: string }>(
       "insert into auth.users (email) values ($1) returning id::text",
@@ -65,7 +80,6 @@ export async function seedDemoPeople(db: PGlite, now: Date): Promise<DemoIds> {
     }
   }
 
-  const store = createPgBillingStore(db);
   for (const s of DEMO_STUDENTS) {
     const added = new Date(now.getTime() - s.addedDaysAgo * 86_400_000);
     const owner = ids.payers[s.owner]!;
@@ -91,8 +105,10 @@ export async function seedDemoPeople(db: PGlite, now: Date): Promise<DemoIds> {
        values ($1, 'granted', 'web_checkbox', 'demo', $2, $3)`,
       [id, owner, added],
     );
-    // Trials start at seeding, so plans are active for the next 7 days.
-    if (s.plan === "trial") await startFreeTrial(store, id, now);
+    // Trials start at seeding (active for 7 days); paid plans have their past payments.
+    for (const event of demoBillingEvents(s, id, ids.ambassadors, now)) {
+      await db.query("select public.apply_billing_event($1::jsonb)", [JSON.stringify(event)]);
+    }
 
     // A set of 5 answers (4 right) at 12:00 Lagos on each practice day.
     for (const daysAgo of s.practisedDaysAgo) {

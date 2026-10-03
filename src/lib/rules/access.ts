@@ -21,6 +21,8 @@ export type Access = {
   until: Date | null;
   /** Set when a guardian hasn't consented yet: inactive whatever has been paid. */
   awaitingConsent?: boolean;
+  /** Set when an admin has paused the student: inactive whatever has been paid. */
+  paused?: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,7 +41,10 @@ function addDays(date: Date | null, days: number): Date | null {
  * - incomplete: never gave access (checkout not finished, or paused).
  * - KinPrep's own free trial: until it ends, with no grace (grace is for failed payments).
  */
-export function coverageWindow(coverage: Coverage): {
+export function coverageWindow(
+  coverage: Coverage,
+  graceDays: number = GRACE_DAYS,
+): {
   paidThrough: Date | null;
   graceEnd: Date | null;
 } {
@@ -53,17 +58,17 @@ export function coverageWindow(coverage: Coverage): {
   switch (coverage.status) {
     case "trialing": {
       const end = coverage.trialEnd ?? coverage.currentPeriodEnd;
-      return { paidThrough: end, graceEnd: addDays(end, GRACE_DAYS) };
+      return { paidThrough: end, graceEnd: addDays(end, graceDays) };
     }
     case "active":
       return {
         paidThrough: coverage.currentPeriodEnd,
-        graceEnd: addDays(coverage.currentPeriodEnd, GRACE_DAYS),
+        graceEnd: addDays(coverage.currentPeriodEnd, graceDays),
       };
     case "past_due":
       return {
         paidThrough: null,
-        graceEnd: coverage.graceUntil ?? addDays(coverage.currentPeriodEnd, GRACE_DAYS),
+        graceEnd: coverage.graceUntil ?? addDays(coverage.currentPeriodEnd, graceDays),
       };
     case "canceled":
       return { paidThrough: coverage.currentPeriodEnd, graceEnd: null };
@@ -75,10 +80,14 @@ export function coverageWindow(coverage: Coverage): {
 const RANK: Record<AccessState, number> = { inactive: 0, grace: 1, active: 2 };
 
 /** The best access any coverage gives at `now`, and until when it lasts. */
-export function evaluateAccess(coverages: readonly Coverage[], now: Date): Access {
+export function evaluateAccess(
+  coverages: readonly Coverage[],
+  now: Date,
+  graceDays: number = GRACE_DAYS,
+): Access {
   let best: Access = { state: "inactive", until: null };
   for (const coverage of coverages) {
-    const { paidThrough, graceEnd } = coverageWindow(coverage);
+    const { paidThrough, graceEnd } = coverageWindow(coverage, graceDays);
     let candidate: Access;
     if (paidThrough && now < paidThrough) {
       candidate = { state: "active", until: paidThrough };

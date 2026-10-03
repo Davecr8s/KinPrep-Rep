@@ -4,7 +4,12 @@
 import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { ensureDemoQuestions, ensureReviewer } from "./lib/demo-content.ts";
-import { DEMO_PAYERS, DEMO_STUDENTS } from "./lib/demo-people.ts";
+import {
+  DEMO_AMBASSADORS,
+  DEMO_PAYERS,
+  DEMO_STUDENTS,
+  demoBillingEvents,
+} from "./lib/demo-people.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secret = process.env.SUPABASE_SECRET_KEY;
@@ -77,11 +82,25 @@ if (!studentId) {
   if (consent.error) fail("consent", consent.error);
 }
 
-// 3. An ambassador to try referral codes with.
-const ambassador = await db
-  .from("ambassadors")
-  .upsert({ name: "Demo Ambassador", code: "DEMO10" }, { onConflict: "code" });
-if (ambassador.error) fail("ambassador", ambassador.error);
+// 3. Ambassadors to try referral codes and payouts with (DEMO10 in Nigeria, DEMOUK in the UK).
+const ambassadorIds: Record<string, string> = {};
+for (const a of DEMO_AMBASSADORS) {
+  const saved = await db
+    .from("ambassadors")
+    .upsert(
+      {
+        name: a.name,
+        code: a.code,
+        payout_country: a.payoutCountry,
+        payout_method: a.payoutMethod,
+      },
+      { onConflict: "code" },
+    )
+    .select("id")
+    .single<{ id: string }>();
+  if (saved.error) fail("ambassador", saved.error);
+  ambassadorIds[a.code] = saved.data.id;
+}
 
 // 4. Sponsor link.
 const link = await db
@@ -193,27 +212,11 @@ for (const s of DEMO_STUDENTS) {
     });
     if (consent.error) fail("consent", consent.error);
   }
-  if (s.plan === "trial") {
-    // One trial per student (the event id makes a re-run a no-op): it lapses 7 days after the
-    // first seed. Delete the student and seed again for a fresh one.
-    const trialEnd = new Date(Date.now() + 7 * 86_400_000).toISOString();
-    const trial = await db.rpc("apply_billing_event", {
-      p: {
-        provider: "trial",
-        event_id: `trial:${id}`,
-        event_type: "trial.started",
-        occurred_at: new Date().toISOString(),
-        subscription: {
-          student_id: id,
-          plan: "nigeria_weekly",
-          currency: "NGN",
-          status: "trialing",
-          trial_end: trialEnd,
-          current_period_end: trialEnd,
-        },
-      },
-    });
-    if (trial.error) fail("trial", trial.error);
+  // Trials (one per student: a re-run is a no-op, so it lapses 7 days after the first seed) and
+  // paid plans with their past bank-transfer payments, some referred by an ambassador.
+  for (const event of demoBillingEvents(s, id, ambassadorIds, new Date())) {
+    const applied = await db.rpc("apply_billing_event", { p: event });
+    if (applied.error) fail("billing", applied.error);
   }
   // Recent practice: a set of 5 answers (4 right) at 12:00 Lagos on each practice day.
   for (const daysAgo of s.practisedDaysAgo) {

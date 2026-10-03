@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { z } from "zod";
 import { GRACE_DAYS, PLANS, TRIAL_DAYS } from "@/config/pricing";
 import type { SubscriptionStatus } from "@/lib/rules/access";
+import { DEFAULT_BILLING } from "./billing-settings";
 import {
   CurrencySchema,
   intervalOf,
@@ -159,6 +160,7 @@ function invoiceContext(invoice: Stripe.Invoice) {
 export async function stripeEventToUpdate(
   event: Stripe.Event,
   api: Pick<StripeApi, "subscriptions">,
+  graceDays: number = GRACE_DAYS,
 ): Promise<BillingUpdate | null> {
   const base = {
     provider: "stripe" as const,
@@ -242,7 +244,7 @@ export async function stripeEventToUpdate(
         subscription: {
           ...context.patch,
           status: "past_due",
-          grace_until: iso(event.created + GRACE_DAYS * DAY_SECONDS),
+          grace_until: iso(event.created + graceDays * DAY_SECONDS),
         },
         payment: {
           provider_payment_id: `${invoice.id}:attempt:${invoice.attempt_count}`,
@@ -271,6 +273,7 @@ export function createStripeProvider(deps: {
 
     async createCheckout(input) {
       const { target, planId, currency } = input;
+      const billing = (await store.billingSettings?.()) ?? DEFAULT_BILLING;
       if (PLANS[planId].region === "nigeria" || input.channel === "bank_transfer_or_ussd") {
         throw new Error("Naira plans are paid through Paystack or Manual, not Stripe");
       }
@@ -294,7 +297,7 @@ export function createStripeProvider(deps: {
             quantity: target.kind === "group" ? target.seats : 1,
             price_data: {
               currency: currency.toLowerCase(),
-              unit_amount: priceFor(planId, currency),
+              unit_amount: priceFor(planId, currency, billing.prices),
               recurring: { interval: intervalOf(planId) },
               product_data: { name: PLAN_LABELS[planId] },
             },
@@ -323,7 +326,8 @@ export function createStripeProvider(deps: {
       } catch {
         throw new WebhookSignatureError();
       }
-      const update = await stripeEventToUpdate(event, api);
+      const billing = (await store.billingSettings?.()) ?? DEFAULT_BILLING;
+      const update = await stripeEventToUpdate(event, api, billing.graceDays);
       if (!update) return { status: "ignored", eventId: event.id };
       return { status: await store.applyBillingEvent(update), eventId: event.id };
     },

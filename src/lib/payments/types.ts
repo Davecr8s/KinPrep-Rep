@@ -127,11 +127,17 @@ export type BillingUpdate = {
 };
 
 /** The data access the payments module needs. Implemented over Supabase (and PGlite in tests). */
+import type { BillingSettings } from "./billing-settings";
+
 export interface BillingStore {
   applyBillingEvent(update: BillingUpdate): Promise<"applied" | "duplicate">;
   getCoverages(studentId: string, at: Date): Promise<Coverage[]>;
   /** True if the latest guardian consent event for the student is "granted". */
   hasGuardianConsent(studentId: string): Promise<boolean>;
+  /** True while an admin has paused the student. */
+  isPaused?(studentId: string): Promise<boolean>;
+  /** Prices and grace days from admin settings (defaults: src/config/pricing.ts). */
+  billingSettings?(): Promise<BillingSettings>;
   hasAnySubscription(studentId: string): Promise<boolean>;
   getSubscription(id: string): Promise<SubscriptionRecord | null>;
   findSponsorLink(code: string): Promise<SponsoredStudent | null>;

@@ -51,6 +51,8 @@ export const COPY = {
     "You've stopped all KinPrep messages. We won't message you again.\n\nChanged your mind? Send START any time.",
   optedOut: "You've stopped KinPrep messages. Send START to begin again.",
   welcomeBack: "Welcome back to KinPrep! 👋",
+  paused: (name: string) =>
+    `Hi ${name}! Your KinPrep practice is paused for now. Your parent or guardian can ask us to restart it.`,
   morningOptIn:
     "I'll send you a short message each morning when your questions are ready. Send STOP any time to stop.",
   awaitingConsent:
@@ -144,6 +146,11 @@ export async function handleInbound(message: InboundMessage, deps: BotDeps): Pro
   }
 
   const sendSponsorLink = async (s: PracticeStudent) => {
+    // Paused by KinPrep (a family's request): no sponsor link, just say so.
+    if (statuses.find((x) => x.s.id === s.id)?.access.paused) {
+      await send(text(COPY.paused(s.first_name)), s.id);
+      return;
+    }
     const code = await sponsorCode(sql, s.id);
     await send(text(COPY.sponsor(s.first_name, `${deps.appUrl}/sponsor/${code}`)), s.id);
   };

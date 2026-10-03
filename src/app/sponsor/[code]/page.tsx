@@ -6,6 +6,7 @@ import { TRIAL_DAYS } from "@/config/pricing";
 import { getStudentAccess } from "@/lib/access";
 import { formatMoney } from "@/lib/money";
 import { isSponsorCodeShape } from "@/lib/payments/codes";
+import { DEFAULT_BILLING } from "@/lib/payments/billing-settings";
 import { priceFor } from "@/lib/payments/plans";
 import { getBillingStore } from "@/lib/payments/server";
 import { startSponsorCheckout } from "./actions";
@@ -54,8 +55,9 @@ export default async function SponsorPage({ params, searchParams }: PageProps<"/
   const access = await getStudentAccess(student.studentId);
   const currency = pickCurrency(query.currency, (await headers()).get("x-vercel-ip-country"));
   const error = typeof query.error === "string" ? ERRORS[query.error] : undefined;
-  const monthly = priceFor("abroad_monthly", currency);
-  const yearly = priceFor("abroad_yearly", currency);
+  const { prices } = (await getBillingStore().billingSettings?.()) ?? DEFAULT_BILLING;
+  const monthly = priceFor("abroad_monthly", currency, prices);
+  const yearly = priceFor("abroad_yearly", currency, prices);
   const yearlySaving = monthly * 12 - yearly;
 
   return (

@@ -1,5 +1,6 @@
 import { QUESTIONS_PER_DAY, type Subject } from "@/config/pilot";
 import type { Sql } from "@/lib/db/sql";
+import { billingSettingsFrom } from "@/lib/payments/billing-settings";
 import { newSponsorCode } from "@/lib/payments/codes";
 import { toCoverage } from "@/lib/payments/rows";
 import type { BillingStore } from "@/lib/payments/types";
@@ -34,7 +35,11 @@ export async function practiceStudent(sql: Sql, id: string): Promise<PracticeStu
 }
 
 /** What isStudentActive needs, read through the same SQL connection. */
-export function accessStore(sql: Sql): Pick<BillingStore, "getCoverages" | "hasGuardianConsent"> {
+export function accessStore(
+  sql: Sql,
+): Required<
+  Pick<BillingStore, "getCoverages" | "hasGuardianConsent" | "isPaused" | "billingSettings">
+> {
   return {
     async getCoverages(studentId, at) {
       const rows = await sql.query("select * from public.student_coverages($1, $2)", [
@@ -49,6 +54,20 @@ export function accessStore(sql: Sql): Pick<BillingStore, "getCoverages" | "hasG
         [studentId],
       );
       return row?.event === "granted";
+    },
+    async isPaused(studentId) {
+      const [row] = await sql.query<{ paused: boolean }>(
+        "select paused_at is not null as paused from public.students where id = $1",
+        [studentId],
+      );
+      return row?.paused ?? false;
+    },
+    async billingSettings() {
+      return billingSettingsFrom(
+        await sql.query<{ key: string; value: unknown }>(
+          "select key, value from public.settings where key in ('price_overrides', 'grace_days')",
+        ),
+      );
     },
   };
 }

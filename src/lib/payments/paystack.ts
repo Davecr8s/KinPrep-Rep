@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { GRACE_DAYS, PLANS, type PlanId } from "@/config/pricing";
+import { DEFAULT_BILLING } from "./billing-settings";
 import { CurrencySchema, PlanIdSchema, pgIntervalOf, priceFor } from "./plans";
 import {
   WebhookSignatureError,
@@ -131,6 +132,7 @@ export function paystackEventToUpdate(
   rawBody: string,
   planCodes: PaystackPlanCodes,
   now: Date = new Date(),
+  graceDays: number = GRACE_DAYS,
 ): BillingUpdate | null {
   const envelope = EnvelopeSchema.safeParse(body);
   if (!envelope.success) return null;
@@ -262,7 +264,7 @@ export function paystackEventToUpdate(
         subscription: {
           provider_subscription_id: invoice.subscription.subscription_code,
           status: "past_due",
-          grace_until: new Date(new Date(occurredAt).getTime() + GRACE_DAYS * DAY_MS).toISOString(),
+          grace_until: new Date(new Date(occurredAt).getTime() + graceDays * DAY_MS).toISOString(),
         },
         payment: {
           provider_payment_id: `invoice:${key}:failed`,
@@ -323,13 +325,14 @@ export function createPaystackProvider(deps: {
       if (target.kind !== "student") throw new Error("Group seats are paid through Stripe");
       if (!input.payerEmail) throw new Error("Paystack needs the payer's email address");
       const card = (input.channel ?? "card") === "card";
+      const billing = (await store.billingSettings?.()) ?? DEFAULT_BILLING;
       const planCode = planCodes[planId as keyof PaystackPlanCodes];
       if (card && !planCode) throw new Error(`No Paystack plan code configured for ${planId}`);
 
       const reference = `kp_${randomUUID().replaceAll("-", "")}`;
       const json = await call("POST", "/transaction/initialize", {
         email: input.payerEmail,
-        amount: priceFor(planId, "NGN"),
+        amount: priceFor(planId, "NGN", billing.prices),
         currency: "NGN",
         reference,
         callback_url: input.successUrl,
@@ -354,7 +357,14 @@ export function createPaystackProvider(deps: {
       if (!verifyPaystackSignature(rawBody, headers.get("x-paystack-signature"), secretKey)) {
         throw new WebhookSignatureError();
       }
-      const update = paystackEventToUpdate(JSON.parse(rawBody), rawBody, planCodes);
+      const billing = (await store.billingSettings?.()) ?? DEFAULT_BILLING;
+      const update = paystackEventToUpdate(
+        JSON.parse(rawBody),
+        rawBody,
+        planCodes,
+        new Date(),
+        billing.graceDays,
+      );
       if (!update) return { status: "ignored" };
       return { status: await store.applyBillingEvent(update), eventId: update.event_id };
     },

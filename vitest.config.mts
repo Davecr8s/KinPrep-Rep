@@ -25,6 +25,8 @@ export default defineConfig({
         "src/lib/engine/runway.ts",
         "src/lib/jobs/rules.ts",
         "src/lib/bank/rules.ts",
+        "src/lib/admin/rules.ts",
+        "src/lib/payments/billing-settings.ts",
       ],
       exclude: ["**/*.test.ts"],
       // Business rules and the engine's decisions must be fully tested (CLAUDE.md, Phase 2).
@@ -33,6 +35,8 @@ export default defineConfig({
         "src/lib/engine/{select,mastery,runway}.ts": { lines: 100, branches: 100, functions: 100 },
         "src/lib/jobs/rules.ts": { lines: 100, branches: 100, functions: 100 },
         "src/lib/bank/rules.ts": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/admin/rules.ts": { lines: 100, branches: 100, functions: 100 },
+        "src/lib/payments/billing-settings.ts": { lines: 100, branches: 100, functions: 100 },
       },
     },
   },

@@ -3,12 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccessBadge } from "@/components/access-badge";
 import { Card, Notice, PageTitle, styles } from "@/components/ui";
-import { PLANS, TRIAL_DAYS, type PlanId } from "@/config/pricing";
+import { TRIAL_DAYS, type PlanId } from "@/config/pricing";
 import { requirePayer } from "@/lib/auth";
 import { getChild } from "@/lib/data/children";
 import { manualBankDetails } from "@/lib/data/settings";
 import { childAccess } from "@/lib/data/status";
 import { formatMoney } from "@/lib/money";
+import { DEFAULT_BILLING } from "@/lib/payments/billing-settings";
 import { getBillingStore } from "@/lib/payments/server";
 import { startPlanCheckout } from "./actions";
 
@@ -61,6 +62,7 @@ export default async function PlanPage({
   if (!child || child.owner_id !== user.id) notFound();
 
   const status = await childAccess(id);
+  const { prices } = (await getBillingStore().billingSettings?.()) ?? DEFAULT_BILLING;
   const error = typeof query.error === "string" ? ERRORS[query.error] : undefined;
   const transferRef = typeof query.transfer === "string" ? query.transfer : null;
 
@@ -74,7 +76,7 @@ export default async function PlanPage({
         <PageTitle>Pay by bank transfer</PageTitle>
         <Card className="flex flex-col gap-3 text-lg">
           <p>
-            Transfer <strong>{formatMoney(PLANS[plan].prices.NGN, "NGN")}</strong> to:
+            Transfer <strong>{formatMoney(prices[plan].NGN!, "NGN")}</strong> to:
           </p>
           {bank ? (
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
@@ -130,14 +132,14 @@ export default async function PlanPage({
                 name="plan"
                 value="abroad_monthly"
                 defaultChecked
-                title={`${formatMoney(PLANS.abroad_monthly.prices[currency], currency)} a month`}
+                title={`${formatMoney(prices.abroad_monthly[currency]!, currency)} a month`}
                 body="Cancel any time"
               />
               <Option
                 name="plan"
                 value="abroad_yearly"
-                title={`${formatMoney(PLANS.abroad_yearly.prices[currency], currency)} a year`}
-                body={`Save ${formatMoney(PLANS.abroad_monthly.prices[currency] * 12 - PLANS.abroad_yearly.prices[currency], currency)} a year`}
+                title={`${formatMoney(prices.abroad_yearly[currency]!, currency)} a year`}
+                body={`Save ${formatMoney(prices.abroad_monthly[currency]! * 12 - prices.abroad_yearly[currency]!, currency)} a year`}
               />
             </fieldset>
             <input type="hidden" name="currency" value={currency} />
@@ -159,13 +161,13 @@ export default async function PlanPage({
               <Option
                 name="plan"
                 value="nigeria_weekly"
-                title={`${formatMoney(PLANS.nigeria_weekly.prices.NGN, "NGN")} a week`}
+                title={`${formatMoney(prices.nigeria_weekly.NGN!, "NGN")} a week`}
               />
               <Option
                 name="plan"
                 value="nigeria_monthly"
                 defaultChecked
-                title={`${formatMoney(PLANS.nigeria_monthly.prices.NGN, "NGN")} a month`}
+                title={`${formatMoney(prices.nigeria_monthly.NGN!, "NGN")} a month`}
                 body="Best value"
               />
             </fieldset>

@@ -19,10 +19,20 @@ export const PLAN_LABELS: Record<PlanId, string> = {
   bulk_seat_monthly: "KinPrep group seat, monthly",
 };
 
+export type PriceTable = Record<PlanId, Partial<Record<Currency, number>>>;
+
+/** The prices in src/config/pricing.ts; admin settings can override them (billing-settings.ts). */
+export const CONFIG_PRICES: PriceTable = Object.fromEntries(
+  Object.entries(PLANS).map(([id, plan]) => [id, { ...plan.prices }]),
+) as PriceTable;
+
 /** Price in minor units for a plan in a currency; throws if the plan isn't sold in it. */
-export function priceFor(planId: PlanId, currency: Currency): number {
-  const prices: Partial<Record<Currency, number>> = PLANS[planId].prices;
-  const amount = prices[currency];
+export function priceFor(
+  planId: PlanId,
+  currency: Currency,
+  prices: PriceTable = CONFIG_PRICES,
+): number {
+  const amount = prices[planId][currency];
   if (amount === undefined) {
     throw new Error(`Plan ${planId} is not sold in ${currency}`);
   }

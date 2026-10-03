@@ -9,7 +9,8 @@ import type { Sql } from "@/lib/db/sql";
 import { streakThreshold } from "@/lib/engine";
 import { practiceUrl, signPracticeLink } from "@/lib/practice/links";
 import { accessStore, answerHistory } from "@/lib/practice/repo";
-import { addDays, lagosDay, lagosDayStart } from "@/lib/rules/days";
+import { addDays, lagosDay, lagosDayStart, weekStart } from "@/lib/rules/days";
+import { todaysLinks } from "@/lib/practice/daily-links";
 import type { Outbound, TemplateButtonValue } from "@/lib/whatsapp/messages";
 import type { EmailMessage } from "./email";
 import { enqueue, type QueueItem } from "./queue";
@@ -34,6 +35,10 @@ export type JobContext = {
   dryRun: boolean;
   appUrl: string;
   practiceSecret: string;
+  /** Pilot console: queue the messages for an admin to send by hand from WhatsApp Business. */
+  manual?: boolean;
+  /** Pilot console: every payer's weekly report now, whatever time they chose. */
+  allReportsDue?: boolean;
 };
 
 export type Planned = {
@@ -49,7 +54,7 @@ export type Planned = {
 };
 
 export type JobReport = {
-  job: JobName;
+  job: JobName | "practice-links";
   day: string;
   at: Date;
   dryRun: boolean;
@@ -133,6 +138,7 @@ const PAYER_CONTACT = `p.whatsapp_number as whatsapp,
 async function accessReason(ctx: JobContext, studentId: string): Promise<string | null> {
   const access = await getStudentAccess(studentId, { now: ctx.now, store: accessStore(ctx.sql) });
   if (access.awaitingConsent) return "waiting for guardian consent";
+  if (access.paused) return "paused by an admin";
   return access.state === "inactive" ? "plan not active" : null;
 }
 
@@ -393,10 +399,12 @@ async function weeklyReports(ctx: JobContext, out: Collector): Promise<void> {
      order by p.created_at`,
   );
   for (const p of payers) {
-    const due = reportDue(
-      { timezone: p.timezone, weekday: p.report_weekday, hour: p.report_hour },
-      ctx.now,
-    );
+    const due = ctx.allReportsDue
+      ? { due: true, weekStart: weekStart(lagosDay(ctx.now)) }
+      : reportDue(
+          { timezone: p.timezone, weekday: p.report_weekday, hour: p.report_hour },
+          ctx.now,
+        );
     const children = await ctx.sql.query<{ id: string; first_name: string }>(
       `select s.id::text, s.first_name from public.students s
        where s.owner_id = $1
@@ -455,6 +463,63 @@ async function weeklyReports(ctx: JobContext, out: Collector): Promise<void> {
       });
     }
   }
+}
+
+/**
+ * Pilot console only (sent by hand, never by the worker): today's personal web practice link for
+ * every active student, to the student's WhatsApp (seniors) or the parent's (juniors).
+ */
+async function practiceLinks(ctx: JobContext, out: Collector): Promise<void> {
+  const day = lagosDay(ctx.now);
+  const links = await todaysLinks(ctx.sql, {
+    appUrl: ctx.appUrl,
+    secret: ctx.practiceSecret,
+    issuedAt: ctx.now,
+  });
+  for (const l of links) {
+    const to = l.sendTo.whatsapp ?? l.sendTo.email;
+    if (!to) {
+      out.skip(l.firstName, `no WhatsApp number or email for the ${l.sendTo.who}`);
+      continue;
+    }
+    const message: Message = l.sendTo.whatsapp
+      ? {
+          channel: "whatsapp",
+          recipient: l.sendTo.whatsapp,
+          template: null,
+          category: "utility",
+          payload: { kind: "text", text: l.message },
+          preview: l.message,
+        }
+      : emailMessage(l.sendTo.email!, `${l.firstName}'s KinPrep practice for today`, [l.message]);
+    await out.add({
+      job: "practice_link",
+      dedupeKey: `practice_link:${day}:${l.studentId}`,
+      studentId: l.studentId,
+      lagosDay: day,
+      expiresAt: endOfLagosDay(day),
+      message,
+      about: `${l.firstName}${l.sendTo.who === "parent" ? " (to parent)" : ""}`,
+    });
+  }
+}
+
+export type ManualJob = "practice-links" | "weekly-reports" | "missed-days";
+
+/** The pilot console's "make today's ..." buttons: the jobs' messages, to send by hand. */
+export async function prepareManual(job: ManualJob, ctx: JobContext): Promise<JobReport> {
+  const manual = { ...ctx, dryRun: false, manual: true, allReportsDue: true };
+  if (job !== "practice-links") return runJob(job, manual);
+  const out = new Collector(manual);
+  await practiceLinks(manual, out);
+  return {
+    job: "practice-links",
+    day: lagosDay(ctx.now),
+    at: ctx.now,
+    dryRun: false,
+    planned: out.planned,
+    skipped: out.skipped,
+  };
 }
 
 export async function runJob(job: JobName, ctx: JobContext): Promise<JobReport> {
