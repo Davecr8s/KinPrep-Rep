@@ -23,9 +23,11 @@ const SUPABASE_SHIM = `
 
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
 
-export async function createTestDb(): Promise<PGlite> {
+/** A fresh database with the Supabase shim and (unless told not to) every migration applied. */
+export async function createTestDb(options: { migrations?: boolean } = {}): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(SUPABASE_SHIM);
+  if (options.migrations === false) return db;
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith(".sql"))
     .sort();

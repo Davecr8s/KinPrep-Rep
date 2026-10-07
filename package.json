@@ -26,7 +26,8 @@
     "seed:dev": "node --env-file=.env.local scripts/dev-seed.ts",
     "seed:progress": "node --env-file=.env.local scripts/seed-progress.ts",
     "paystack:plans": "node --env-file=.env.local scripts/paystack-plans.ts",
-    "make-admin": "node --env-file=.env.local scripts/make-admin.ts"
+    "make-admin": "node --env-file=.env.local scripts/make-admin.ts",
+    "db:schema": "node scripts/build-schema.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
